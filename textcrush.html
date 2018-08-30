@@ -1,0 +1,51 @@
+<script src="Util.js"></script>
+<script src="Symbol.js"></script>
+<script src="Neighbor.js"></script>
+<script src="Position.js"></script>
+<script src="Board.js"></script>
+<script src="Game.js"></script>
+<script src="Tile.js"></script>
+<script src="Display.js"></script>
+<script>
+
+    function initialize() {
+
+        let c = document.createElement("canvas");
+
+        c.setAttribute("width", window.innerWidth.toString());
+        c.setAttribute("height", window.innerHeight.toString());
+
+        document.body.style.margin = "0";
+        document.body.appendChild(c);
+
+        let g = new Game(8, 4);
+        let d = new Display(c, g);
+
+        function onClick(e) {
+            let position = d.onClick(e.x, e.y);
+
+            d.draw();
+            let delay = 333;
+            setTimeout(function () {
+
+                g.onRemove(position.x, position.y, {});
+                d.draw();
+
+                setTimeout(function () {
+                    g.moveDown();
+                    d.draw();
+
+                }, delay);
+            }, delay);
+        }
+
+        c.addEventListener('click', (e) => {
+            onClick(e)
+        });
+
+        d.draw();
+    }
+
+    document.addEventListener("DOMContentLoaded", initialize);
+
+</script>
