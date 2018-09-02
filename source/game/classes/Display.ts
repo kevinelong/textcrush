@@ -9,7 +9,9 @@ class Display {
     step: number;
     padding: number;
     game: Game;
-
+    scoreHeight: number;
+    horizontalOffset: number;
+    verticalOffset: number;
 
     constructor(canvas: HTMLCanvasElement, game: Game) {
         this.game = game;
@@ -19,13 +21,20 @@ class Display {
         this.width = this.canvas.width;
         this.height = this.canvas.height;
         this.minimum = Math.min(this.width, this.height);
-        this.step = (this.minimum / this.board.size);
-        this.padding = 3;
+        this.scoreHeight = Math.floor(this.minimum / (this.board.size + 1));
+        this.verticalOffset = this.scoreHeight;
+        this.horizontalOffset = (this.width - this.minimum) / 2;
+        this.step = ((this.minimum - this.scoreHeight) / this.board.size);
+        this.padding = 1;
+        console.log(this);
     }
 
-    onClick(ex:number,ey:number) {
-        let x = Math.floor(ex / this.step);
-        let y = Math.floor(ey / this.step);
+    onClick(ex: number, ey: number) {
+        console.log("display handling click");
+
+
+        let x = Math.floor((ex - this.horizontalOffset) / this.step);
+        let y = Math.floor((ey - this.verticalOffset) / this.step);
 
         this.game.onRemove(x, y, {});
         this.draw();
@@ -48,6 +57,31 @@ class Display {
                 t.draw();
             }
         }
+        let s = this.game.score.toString();
+        let o = "";
+
+        for (let i = s.length - 1; i >= 0; i--) {
+
+            o = s[i] + o;
+
+            if (i > 0 && (((s.length - i) % 3) == 0)) {
+                o = "," + o;
+            }
+        }
+
+        let font_pixels = Math.floor(0.75 * this.scoreHeight);
+        let half_width = Math.floor(this.width / 2);
+
+        c.font = "bold " + font_pixels + "px Arial";
+        c.textAlign = "center";
+        c.lineWidth = 3.5;
+        c.strokeStyle = "#ffeecc";
+        c.fillStyle = "#333333";
+
+        c.strokeText(o, half_width, font_pixels);
+        c.fillText(o, half_width, font_pixels);
+
+        c.textAlign = "left";
     }
 
     // lines(context, size) {

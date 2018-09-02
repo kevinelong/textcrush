@@ -1,17 +1,20 @@
 class Game {
 
+    score: number;
     size: number;
     variations: number;
     randomize: boolean;
     symbols: Array<Symbol>;
     board: Board;
     blank: Symbol;
+	colors: Array<string> = [];
 
     constructor(
         size: number = 3,
         variations: number = 3,
         randomize: boolean = true
     ) {
+        this.score = 0;
         this.size = size;
         this.variations = variations;
         this.randomize = randomize;
@@ -19,13 +22,32 @@ class Game {
 
         this.board = new Board(size);
         this.blank = new Symbol(-1, ' ');
-
+	this.initColors();
         this.getSymbols();
         this.populate();
     }
+	initColors(){
+		let step = 8;
+		let start = 0;
+		let max = 255;
+		let min = 256;
+		for(let r=start;r<=max;r+=step){
+			for(let g=start;g<=max;g+=step){
+				for(let b=start;b<=max;b+=step){
+					if((r+g+b)>=min && (r+g+b) < 999 && (r!=g || r!=b || b!=b)){
+						this.colors.push("rgb("+r+","+g+","+b+")");
+					}
+				}
+			}
+		}
+        	this.colors.sort(Game.randomCompare);
+		
+	}
 
     getRandomSymbol() {
         let r = Util.getRandomInteger(this.variations);
+        let s = this.symbols[r];
+//	s.color = this.colors[Util.getRandomInteger(this.colors.length)];
         return this.symbols[r];
     }
 
@@ -48,19 +70,19 @@ class Game {
         let index = 0;
 
         for (let c = 0; c < 10; c++) {
-            this.symbols.push(new Symbol(index++, c.toString()));
+            this.symbols.push(new Symbol(index++, c.toString(), this.colors[index]));
         }
 
         let base = "A".charCodeAt(0);
 
         for (let a = 0; a < 26; a++) {
-            this.symbols.push(new Symbol(index++, String.fromCharCode(base + a)));
+            this.symbols.push(new Symbol(index++, String.fromCharCode(base + a), this.colors[index]));
         }
 
         let base_lower = "a".charCodeAt(0);
 
         for (let a = 0; a < 26; a++) {
-            this.symbols.push(new Symbol(index++, String.fromCharCode(base_lower + a)));
+            this.symbols.push(new Symbol(index++, String.fromCharCode(base_lower + a), this.colors[index]));
         }
 
         this.symbols.sort(Game.randomCompare);
@@ -98,8 +120,11 @@ class Game {
 
     }
 
-    public onRemove(x: number, y: number, neighbors: Object) {
-        let b = this.board;
+    public onRemove(x: number, y: number, neighbors: any) {
+        console.log("onRemove",x,y);
+        let count = Object.keys(neighbors).length;
+
+	let b = this.board;
 
         let key: string = x.toString() + "," + y.toString();
 
@@ -128,8 +153,12 @@ class Game {
         if (y > 0 && v === b.getPosition(x, y - 1)) {
             this.onRemove(x, y - 1, neighbors);
         }
-
+	if(count==0){
+		let s = Math.pow(10,Math.floor(Object.keys(neighbors).length/2));
+		console.log("points:",s);
+		this.score += s;
+	}
+	    console.log("score;",this.score);
     }
 
 }
-

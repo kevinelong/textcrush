@@ -3,17 +3,37 @@ var Game = (function () {
         if (size === void 0) { size = 3; }
         if (variations === void 0) { variations = 3; }
         if (randomize === void 0) { randomize = true; }
+        this.colors = [];
+        this.score = 0;
         this.size = size;
         this.variations = variations;
         this.randomize = randomize;
         this.symbols = [];
         this.board = new Board(size);
         this.blank = new Symbol(-1, ' ');
+        this.initColors();
         this.getSymbols();
         this.populate();
     }
+    Game.prototype.initColors = function () {
+        var step = 8;
+        var start = 0;
+        var max = 255;
+        var min = 256;
+        for (var r = start; r <= max; r += step) {
+            for (var g = start; g <= max; g += step) {
+                for (var b = start; b <= max; b += step) {
+                    if ((r + g + b) >= min && (r + g + b) < 999 && (r != g || r != b || b != b)) {
+                        this.colors.push("rgb(" + r + "," + g + "," + b + ")");
+                    }
+                }
+            }
+        }
+        this.colors.sort(Game.randomCompare);
+    };
     Game.prototype.getRandomSymbol = function () {
         var r = Util.getRandomInteger(this.variations);
+        var s = this.symbols[r];
         return this.symbols[r];
     };
     Game.prototype.populate = function () {
@@ -30,15 +50,15 @@ var Game = (function () {
     Game.prototype.getSymbols = function () {
         var index = 0;
         for (var c = 0; c < 10; c++) {
-            this.symbols.push(new Symbol(index++, c.toString()));
+            this.symbols.push(new Symbol(index++, c.toString(), this.colors[index]));
         }
         var base = "A".charCodeAt(0);
         for (var a = 0; a < 26; a++) {
-            this.symbols.push(new Symbol(index++, String.fromCharCode(base + a)));
+            this.symbols.push(new Symbol(index++, String.fromCharCode(base + a), this.colors[index]));
         }
         var base_lower = "a".charCodeAt(0);
         for (var a = 0; a < 26; a++) {
-            this.symbols.push(new Symbol(index++, String.fromCharCode(base_lower + a)));
+            this.symbols.push(new Symbol(index++, String.fromCharCode(base_lower + a), this.colors[index]));
         }
         this.symbols.sort(Game.randomCompare);
     };
@@ -65,6 +85,8 @@ var Game = (function () {
         }
     };
     Game.prototype.onRemove = function (x, y, neighbors) {
+        console.log("onRemove", x, y);
+        var count = Object.keys(neighbors).length;
         var b = this.board;
         var key = x.toString() + "," + y.toString();
         if (neighbors.hasOwnProperty(key)) {
@@ -85,6 +107,12 @@ var Game = (function () {
         if (y > 0 && v === b.getPosition(x, y - 1)) {
             this.onRemove(x, y - 1, neighbors);
         }
+        if (count == 0) {
+            var s = Math.pow(10, Math.floor(Object.keys(neighbors).length / 2));
+            console.log("points:", s);
+            this.score += s;
+        }
+        console.log("score;", this.score);
     };
     return Game;
 }());

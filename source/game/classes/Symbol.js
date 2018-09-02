@@ -1,9 +1,11 @@
 var Symbol = (function () {
-    function Symbol(value, character) {
+    function Symbol(value, character, color) {
         if (value === void 0) { value = -1; }
         if (character === void 0) { character = ' '; }
+        if (color === void 0) { color = 'red'; }
         this.value = value;
         this.character = character;
+        this.color = color;
     }
     return Symbol;
 }());
