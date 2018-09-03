@@ -9,8 +9,12 @@ var Tile = (function () {
     Tile.prototype.clear = function () {
         var c = this.display.context;
         var step = this.display.step;
-        c.fillStyle = "grey";
-        c.fillRect(this.cx, this.cy, step, step);
+        var padding = this.display.padding;
+        c.beginPath();
+        c.arc(this.cx + (step - padding) / 2, this.cy + (step - padding) / 2, step / 2 - padding, 0, 2 * Math.PI, false);
+        c.fillStyle = "rgba(128,128,128,0.25)";
+        c.strokeStyle = "rgba(128,128,128,0.25)";
+        c.fill();
     };
     Tile.prototype.circle = function () {
         var c = this.display.context;

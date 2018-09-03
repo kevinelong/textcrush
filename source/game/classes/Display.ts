@@ -35,10 +35,10 @@ class Display {
 
         let x = Math.floor((ex - this.horizontalOffset) / this.step);
         let y = Math.floor((ey - this.verticalOffset) / this.step);
-
-        this.game.onRemove(x, y, {});
+        let neighbors = {};
+        this.game.onRemove(x, y, neighbors);
         this.draw();
-        return new Neighbor(x, y);
+        return {"neighbors": neighbors, "x": x, "y": y};
     }
 
     draw() {
@@ -46,7 +46,7 @@ class Display {
         let size = this.board.size;
         let c = this.context;
 
-        c.fillStyle = "gray";
+        c.fillStyle = "#221100";
         c.fillRect(0, 0, this.width, this.height);
 
         c.fillStyle = "white";
@@ -70,7 +70,7 @@ class Display {
         }
 
         let font_pixels = Math.floor(0.75 * this.scoreHeight);
-        let half_width = Math.floor(this.width / 2);
+        let half_width = this.horizontalOffset + (this.game.size * this.step / 2);
 
         c.font = "bold " + font_pixels + "px Arial";
         c.textAlign = "center";
@@ -82,6 +82,10 @@ class Display {
         c.fillText(o, half_width, font_pixels);
 
         c.textAlign = "left";
+        let m = this.game.movesAvailable - this.game.movesUsed;
+        console.log("moves left", m);
+        c.strokeText(m.toString(), this.horizontalOffset, font_pixels);
+        c.fillText(m.toString(), this.horizontalOffset, font_pixels);
     }
 
     // lines(context, size) {

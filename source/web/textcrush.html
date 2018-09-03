@@ -21,16 +21,51 @@
         let g = new Game(7, 7);
         let d = new Display(c, g);
 
+        let context = new AudioContext();
+
+
         function onClick(e) {
             console.log("inner handling click");
+            let delay = 150;
 
-            let position = d.onClick(e.x, e.y);
+            let values = d.onClick(e.x, e.y);
+            let neighbors = values["neighbors"];
 
             d.draw();
-            let delay = 150;
+
+            let count = Object.keys(neighbors).length;
+            let noteLength = (500 / 8)/1000;
+
+            let notes = [];
+
+            for (let i = 0; i < count; i++) {
+                notes.push( 440 + (60 * i));
+            }
+
+            let duration = noteLength;
+
+            function play(frequency) {
+                let o = context.createOscillator();
+                let g = context.createGain();
+                o.connect(g);
+                g.connect(context.destination);
+                g.gain.exponentialRampToValueAtTime(
+                    0.00001, context.currentTime + duration
+                );
+                o.frequency.value = frequency;
+                o.start();
+            }
+
+            for (let i = 0; i < notes.length; i++) {
+                setTimeout(function(){
+                    play(notes[i]);
+                },noteLength*i*1000);
+            }
+
+
             setTimeout(function () {
 
-                //g.onRemove(position.x, position.y, {});
+                //g.onRemove(values["x"], values["y"], {});
                 d.draw();
 
                 setTimeout(function () {
@@ -40,6 +75,7 @@
                 }, delay);
             }, delay);
         }
+
         console.log("registering click");
 
         c.addEventListener('click', (e) => {

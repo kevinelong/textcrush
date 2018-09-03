@@ -7,7 +7,9 @@ class Game {
     symbols: Array<Symbol>;
     board: Board;
     blank: Symbol;
-	colors: Array<string> = [];
+    colors: Array<string> = [];
+    movesAvailable: number = 20;
+    movesUsed: number = 0;
 
     constructor(
         size: number = 3,
@@ -22,27 +24,28 @@ class Game {
 
         this.board = new Board(size);
         this.blank = new Symbol(-1, ' ');
-	this.initColors();
+        this.initColors();
         this.getSymbols();
         this.populate();
     }
-	initColors(){
-		let step = 8;
-		let start = 0;
-		let max = 255;
-		let min = 256;
-		for(let r=start;r<=max;r+=step){
-			for(let g=start;g<=max;g+=step){
-				for(let b=start;b<=max;b+=step){
-					if((r+g+b)>=min && (r+g+b) < 999 && (r!=g || r!=b || b!=b)){
-						this.colors.push("rgb("+r+","+g+","+b+")");
-					}
-				}
-			}
-		}
-        	this.colors.sort(Game.randomCompare);
-		
-	}
+
+    initColors() {
+        let step = 8;
+        let start = 0;
+        let max = 255;
+        let min = 256;
+        for (let r = start; r <= max; r += step) {
+            for (let g = start; g <= max; g += step) {
+                for (let b = start; b <= max; b += step) {
+                    if ((r + g + b) >= min && (r + g + b) < 999 && (r != g || r != b || b != b)) {
+                        this.colors.push("rgb(" + r + "," + g + "," + b + ")");
+                    }
+                }
+            }
+        }
+        this.colors.sort(Game.randomCompare);
+
+    }
 
     getRandomSymbol() {
         let r = Util.getRandomInteger(this.variations);
@@ -121,10 +124,10 @@ class Game {
     }
 
     public onRemove(x: number, y: number, neighbors: any) {
-        console.log("onRemove",x,y);
+        console.log("onRemove", x, y);
         let count = Object.keys(neighbors).length;
 
-	let b = this.board;
+        let b = this.board;
 
         let key: string = x.toString() + "," + y.toString();
 
@@ -153,12 +156,15 @@ class Game {
         if (y > 0 && v === b.getPosition(x, y - 1)) {
             this.onRemove(x, y - 1, neighbors);
         }
-	if(count==0){
-		let s = Math.pow(10,Math.floor(Object.keys(neighbors).length/2));
-		console.log("points:",s);
-		this.score += s;
-	}
-	    console.log("score;",this.score);
+        if (count == 0) {
+            let n = Object.keys(neighbors).length;
+            console.log("neigbors:", n)
+            let s = Math.pow(2, n - 1);
+            console.log("points:", s);
+            this.score += s;
+            this.movesUsed++;
+        }
+        console.log("score;", this.score);
     }
 
 }

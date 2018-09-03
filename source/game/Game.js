@@ -4,6 +4,8 @@ var Game = (function () {
         if (variations === void 0) { variations = 3; }
         if (randomize === void 0) { randomize = true; }
         this.colors = [];
+        this.movesAvailable = 20;
+        this.movesUsed = 0;
         this.score = 0;
         this.size = size;
         this.variations = variations;
@@ -108,9 +110,12 @@ var Game = (function () {
             this.onRemove(x, y - 1, neighbors);
         }
         if (count == 0) {
-            var s = Math.pow(10, Math.floor(Object.keys(neighbors).length / 2));
+            var n = Object.keys(neighbors).length;
+            console.log("neigbors:", n);
+            var s = Math.pow(2, n - 1);
             console.log("points:", s);
             this.score += s;
+            this.movesUsed++;
         }
         console.log("score;", this.score);
     };

@@ -21,11 +21,26 @@ class Tile {
     // }
 
     private clear() {
-        let c = this.display.context;
-        let step = this.display.step;
 
-        c.fillStyle = "grey";
-        c.fillRect(this.cx, this.cy, step, step);
+        let c = this.display.context;
+
+        let step = this.display.step;
+        let padding = this.display.padding;
+
+        c.beginPath();
+
+        c.arc(
+            this.cx + (step - padding) / 2,
+            this.cy + (step - padding) / 2,
+            step / 2 - padding,
+            0,
+            2 * Math.PI,
+            false
+        );
+
+        c.fillStyle = "rgba(128,128,128,0.25)";
+        c.strokeStyle = "rgba(128,128,128,0.25)";
+        c.fill();
     }
 
     private circle() {
