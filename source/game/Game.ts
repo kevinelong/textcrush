@@ -124,7 +124,7 @@ class Game {
     }
 
     public onRemove(x: number, y: number, neighbors: any) {
-        console.log("onRemove", x, y);
+        //console.log("onRemove", x, y);
         let count = Object.keys(neighbors).length;
 
         let b = this.board;
@@ -158,13 +158,13 @@ class Game {
         }
         if (count == 0) {
             let n = Object.keys(neighbors).length;
-            console.log("neigbors:", n)
+            //console.log("neigbors:", n)
             let s = Math.pow(2, n - 1);
-            console.log("points:", s);
+            //console.log("points:", s);
             this.score += s;
             this.movesUsed++;
         }
-        console.log("score;", this.score);
+        //console.log("score;", this.score);
     }
 
 }

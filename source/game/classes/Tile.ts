@@ -12,7 +12,7 @@ class Tile {
         this.display = display;
         this.cx = (this.position.x * this.display.step) + this.display.horizontalOffset;
         this.cy = (this.position.y * this.display.step) + this.display.verticalOffset;
-	    //console.log(this.cx,this.cy);
+	    ////console.log(this.cx,this.cy);
     }
 
     //

@@ -26,11 +26,11 @@ class Display {
         this.horizontalOffset = (this.width - this.minimum) / 2;
         this.step = ((this.minimum - this.scoreHeight) / this.board.size);
         this.padding = 1;
-        console.log(this);
+        //console.log(this);
     }
 
     onClick(ex: number, ey: number) {
-        console.log("display handling click");
+        //console.log("display handling click");
 
 
         let x = Math.floor((ex - this.horizontalOffset) / this.step);
@@ -83,7 +83,7 @@ class Display {
 
         c.textAlign = "left";
         let m = this.game.movesAvailable - this.game.movesUsed;
-        console.log("moves left", m);
+        //console.log("moves left", m);
         c.strokeText(m.toString(), this.horizontalOffset, font_pixels);
         c.fillText(m.toString(), this.horizontalOffset, font_pixels);
     }

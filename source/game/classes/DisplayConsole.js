@@ -2,7 +2,6 @@ var DisplayConsole = (function () {
     function DisplayConsole() {
     }
     DisplayConsole.prototype.draw = function (b) {
-        console.log(this.toString(b));
     };
     DisplayConsole.prototype.toString = function (b) {
         var output = [];

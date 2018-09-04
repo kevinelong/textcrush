@@ -12,10 +12,8 @@ var Display = (function () {
         this.horizontalOffset = (this.width - this.minimum) / 2;
         this.step = ((this.minimum - this.scoreHeight) / this.board.size);
         this.padding = 1;
-        console.log(this);
     }
     Display.prototype.onClick = function (ex, ey) {
-        console.log("display handling click");
         var x = Math.floor((ex - this.horizontalOffset) / this.step);
         var y = Math.floor((ey - this.verticalOffset) / this.step);
         var neighbors = {};
@@ -54,7 +52,6 @@ var Display = (function () {
         c.fillText(o, half_width, font_pixels);
         c.textAlign = "left";
         var m = this.game.movesAvailable - this.game.movesUsed;
-        console.log("moves left", m);
         c.strokeText(m.toString(), this.horizontalOffset, font_pixels);
         c.fillText(m.toString(), this.horizontalOffset, font_pixels);
     };

@@ -87,7 +87,6 @@ var Game = (function () {
         }
     };
     Game.prototype.onRemove = function (x, y, neighbors) {
-        console.log("onRemove", x, y);
         var count = Object.keys(neighbors).length;
         var b = this.board;
         var key = x.toString() + "," + y.toString();
@@ -111,13 +110,10 @@ var Game = (function () {
         }
         if (count == 0) {
             var n = Object.keys(neighbors).length;
-            console.log("neigbors:", n);
             var s = Math.pow(2, n - 1);
-            console.log("points:", s);
             this.score += s;
             this.movesUsed++;
         }
-        console.log("score;", this.score);
     };
     return Game;
 }());
