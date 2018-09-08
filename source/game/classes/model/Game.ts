@@ -158,13 +158,10 @@ class Game {
         }
         if (count == 0) {
             let n = Object.keys(neighbors).length;
-            //console.log("neigbors:", n)
             let s = Math.pow(2, n - 1);
-            //console.log("points:", s);
             this.score += s;
             this.movesUsed++;
         }
-        //console.log("score;", this.score);
     }
 
 }

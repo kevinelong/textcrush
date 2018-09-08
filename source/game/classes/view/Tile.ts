@@ -3,8 +3,8 @@ class Tile {
     position: Symbol;
     board: Board;
     display: Display;
-	cx:number;
-	cy:number;
+    cx: number;
+    cy: number;
 
     constructor(position: Symbol, board: Board, display: Display) {
         this.position = position;
@@ -12,7 +12,7 @@ class Tile {
         this.display = display;
         this.cx = (this.position.x * this.display.step) + this.display.horizontalOffset;
         this.cy = (this.position.y * this.display.step) + this.display.verticalOffset;
-	    ////console.log(this.cx,this.cy);
+        ////console.log(this.cx,this.cy);
     }
 
     //
@@ -38,9 +38,13 @@ class Tile {
             false
         );
 
-        c.fillStyle = "rgba(128,128,128,0.25)";
-        c.strokeStyle = "rgba(128,128,128,0.25)";
+
+        c.fillStyle = "rgb(128,128,128)";
+        c.strokeStyle = "rgb(128,128,128)";
+
         c.fill();
+
+        c.globalAlpha = 1;
     }
 
     private circle() {
@@ -88,9 +92,10 @@ class Tile {
             2 * Math.PI,
             false
         );
-
-        c.fillStyle = 'rgba(255,255,255,0.3)';
+        c.globalAlpha = 0.3;
+        c.fillStyle = 'rgb(255,255,255)';
         c.fill();
+        c.globalAlpha = 1;
     }
 
     private shadow() {
@@ -101,7 +106,7 @@ class Tile {
         let padding = this.display.padding;
 
         let cx = this.cx;
-        let cy = this.cy + ((step-padding) * 0.75);
+        let cy = this.cy + ((step - padding) * 0.75);
 
         c.beginPath();
 
@@ -115,9 +120,10 @@ class Tile {
             2 * Math.PI,
             false
         );
-
-        c.fillStyle = 'rgba(0,0,0,0.3)';
+        c.globalAlpha = 0.3;
+        c.fillStyle = 'rgb(0,0,0)';
         c.fill();
+        c.globalAlpha = 1;
     }
 
     private text() {
@@ -126,33 +132,28 @@ class Tile {
         let padding = this.display.padding;
 
         let cx = this.cx;
-        let cy = this.cy
+        let cy = this.cy;
 
         let c = this.display.context;
 
         let s = this.position.character;
 
-        //c.fillStyle = this.position.color;
-        c.fillStyle = "rgba(255,255,255)";
-        c.strokeStyle = "rgba(0,0,0)";
+        c.fillStyle = "rgb(255,255,255)";
+        c.strokeStyle = "rgb(0,0,0)";
         c.lineWidth = 4.5;
-        c.font = "bolder " + ((step - padding)* 0.75) + "px Arial";
-	c.globalAlpha=0.8;
+        c.font = "bolder " + ((step - padding) * 0.75) + "px Arial";
+
+        c.globalAlpha = 0.8;
+        c.textAlign = "center";
 
         let mt = c.measureText(s);
-        c.strokeText(
-            s,
-            Math.floor(cx + ((step - padding) / 2) - (mt.width / 2)),
-            Math.ceil(cy + (step * 0.75))
-        );
+        let x = Math.floor(cx + ((step - padding/2)/2);
+        let y = Math.ceil(cy + (step * 0.75));
 
-        c.fillText(
-            s,
-            Math.floor(cx + ((step - padding) / 2) - (mt.width / 2)),
-            Math.ceil(cy + (step * 0.75))
-        );
+        c.strokeText(s, x, y);
+        c.fillText(s, x, y);
 
-	c.globalAlpha=1;
+        c.globalAlpha = 1;
     }
 
     public draw() {

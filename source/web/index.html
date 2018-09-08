@@ -1,14 +1,19 @@
-<script src="../game/classes/Util.js"></script>
-<script src="../game/classes/Symbol.js"></script>
-<script src="../game/classes/Neighbor.js"></script>
-<script src="../game/classes/Position.js"></script>
-<script src="../game/classes/Board.js"></script>
-<script src="../game/Game.js"></script>
-<script src="../game/classes/Tile.js"></script>
-<script src="../game/classes/Display.js"></script>
+<script src="../game/classes/model/Util.js"></script>
+<script src="../game/classes/model/Symbol.js"></script>
+<script src="../game/classes/model/Neighbor.js"></script>
+<script src="../game/classes/model/Position.js"></script>
+<script src="../game/classes/model/Board.js"></script>
+<script src="../game/classes/model/Game.js"></script>
+<script src="../game/classes/view/Tile.js"></script>
+<script src="../game/classes/view/Display.js"></script>
 <script>
 
-    function initialize() {
+    document.addEventListener("DOMContentLoaded", function () {
+
+        let AudioContext = window.AudioContext // Default
+            || window.webkitAudioContext // Safari and old versions of Chrome
+            || false;
+        let context = new AudioContext();
 
         let c = document.createElement("canvas");
 
@@ -18,81 +23,98 @@
         document.body.style.margin = "0";
         document.body.appendChild(c);
 
-        let g = new Game(7, 7);
-        let d = new Display(c, g);
+        function initialize() {
+
+            c.removeEventListener('click', initialize);
+
+            let g = new Game(7, 7);
+            let d = new Display(c, g);
 
 
+            function gameOver() {
+                c.removeEventListener('click', onClick);
+                d.showGameOver();
+                c.addEventListener('click', initialize);
+            }
 
-        function onClick(e) {
-            //console.log("inner handling click");
-            let delay = 150;
+            function onClick(e) {
 
-            let values = d.onClick(e.x, e.y);
-            let neighbors = values["neighbors"];
+                let delay = 150;
 
-            d.draw();
-
-            let AudioContext = window.AudioContext // Default
-                || window.webkitAudioContext // Safari and old versions of Chrome
-                || false;
-            if (AudioContext) {
-                let context = new AudioContext();
-
-                let count = Object.keys(neighbors).length;
-                let noteLength = (500 / 8) / 1000;
-
-                let notes = [];
-
-                for (let i = 0; i < count; i++) {
-                    notes.push(440 + (60 * i));
+                let values = d.onClick(e.x, e.y);
+                if (g.movesUsed >= g.movesAvailable) {
+                    gameOver();
+                    return;
                 }
 
-                let duration = noteLength;
+                let neighbors = values["neighbors"];
 
-                function play(frequency) {
-                    let o = context.createOscillator();
-                    let g = context.createGain();
-                    o.connect(g);
-                    g.connect(context.destination);
-                    g.gain.exponentialRampToValueAtTime(
-                        0.00001, context.currentTime + duration
-                    );
-                    o.frequency.value = frequency;
-                    o.start();
-                }
+                d.draw();
 
-                for (let i = 0; i < notes.length; i++) {
+                if (AudioContext) {
+
+                    let count = Object.keys(neighbors).length;
+                    let noteLength = (500 / 8) / 1000;
+
+                    let notes = [];
+
+                    for (let i = 0; i < count; i++) {
+                        notes.push(440 + (60 * i));
+                    }
+
+                    let duration = noteLength;
+
+                    function play(frequency) {
+                        let o = context.createOscillator();
+                        let g = context.createGain();
+                        o.connect(g);
+                        g.connect(context.destination);
+                        g.gain.exponentialRampToValueAtTime(
+                            0.00001, context.currentTime + duration
+                        );
+                        o.frequency.value = frequency;
+                        o.start();
+                    }
+
+                    for (let i = 0; i < notes.length; i++) {
+                        setTimeout(function () {
+                            play(notes[i]);
+                        }, noteLength * i * 1000);
+                    }
+
+
                     setTimeout(function () {
-                        play(notes[i]);
-                    }, noteLength * i * 1000);
-                }
-
-
-                setTimeout(function () {
-
-                    //g.onRemove(values["x"], values["y"], {});
-                    d.draw();
-
-                    setTimeout(function () {
-                        g.moveDown();
                         d.draw();
 
+                        setTimeout(function () {
+                            g.moveDown();
+                            d.draw();
+
+                        }, delay);
                     }, delay);
-                }, delay);
+                }
             }
+
+            c.addEventListener('click', onClick);
+
+            d.draw();
         }
 
-        //console.log("registering click");
+        initialize();
 
-        c.addEventListener('click', (e) => {
-            //console.log("outer handling click");
+        (function() {
+            window.addEventListener("resize", resizeThrottler, false);
+            let resizeTimeout = null;
+            function resizeThrottler() {
+                if ( !resizeTimeout ) {
+                    resizeTimeout = setTimeout(function() {
+                        resizeTimeout = null;
+                        debugger;
+                        d.draw();
+                    }, 66);
+                }
+            }
+        }());    });
 
-            onClick(e)
-        });
-
-        d.draw();
-    }
-
-    document.addEventListener("DOMContentLoaded", initialize);
 
 </script>
