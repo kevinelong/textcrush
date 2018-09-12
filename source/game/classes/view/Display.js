@@ -29,7 +29,12 @@ var Display = (function () {
         this.font_pixels = Math.floor(0.75 * this.scoreHeight);
         this.context.font = "bold " + this.font_pixels + "px Arial";
     };
+    Display.prototype.setFontSmall = function () {
+        this.font_pixels = Math.floor(0.25 * this.scoreHeight);
+        this.context.font = "bold " + this.font_pixels + "px Arial";
+    };
     Display.prototype.topCenterText = function (s) {
+        this.setFont();
         var c = this.context;
         c.textAlign = "center";
         c.lineWidth = 3.5;
@@ -44,17 +49,18 @@ var Display = (function () {
         c.lineWidth = 3.5;
         c.strokeStyle = "#ffeecc";
         c.fillStyle = "#333333";
-        var y = this.font_pixels * 3;
+        var y = this.canvas.height / 2 - this.font_pixels / 2;
         c.strokeText(s, this.half_width, y);
         c.fillText(s, this.half_width, y);
     };
     Display.prototype.bottomCenterText = function (s) {
+        this.setFont();
         var c = this.context;
         c.textAlign = "center";
         c.lineWidth = 3.5;
         c.strokeStyle = "#ffeecc";
         c.fillStyle = "#333333";
-        var y = this.font_pixels * 5;
+        var y = this.canvas.height - this.step;
         c.strokeText(s, this.half_width, y);
         c.fillText(s, this.half_width, y);
     };
@@ -68,9 +74,9 @@ var Display = (function () {
         }
         return o;
     };
-    Display.prototype.showGameOver = function () {
-        this.clearBackGround();
-        this.middleCenterText("Game Over");
+    Display.prototype.showGameOver = function (message) {
+        this.shadeBackGround();
+        this.middleCenterText(message);
         this.bottomCenterText("Tap to Continue");
         this.updateScore();
     };
@@ -88,19 +94,28 @@ var Display = (function () {
         }
     };
     Display.prototype.topLeftText = function (s) {
+        this.setFont();
         var c = this.context;
         c.textAlign = "left";
         c.strokeText(s.toString(), this.horizontalOffset, this.font_pixels);
         c.fillText(s.toString(), this.horizontalOffset, this.font_pixels);
     };
     Display.prototype.updateMovesAvailable = function () {
+        this.setFontSmall();
         var m = this.game.movesAvailable - this.game.movesUsed;
-        this.topLeftText(m.toString());
+        this.topLeftText(m.toString() + " turns");
     };
     Display.prototype.clearBackGround = function () {
         var c = this.context;
         c.fillStyle = "#221100";
         c.fillRect(0, 0, this.width, this.height);
+    };
+    Display.prototype.shadeBackGround = function () {
+        var c = this.context;
+        c.fillStyle = "#221100";
+        c.globalAlpha = 0.70;
+        c.fillRect(0, 0, this.width, this.height);
+        c.globalAlpha = 1;
     };
     Display.prototype.draw = function () {
         this.half_width = this.horizontalOffset + (this.game.size * this.step / 2);

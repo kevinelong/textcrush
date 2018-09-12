@@ -18,14 +18,20 @@ var Game = (function () {
         this.populate();
     }
     Game.prototype.initColors = function () {
-        var step = 8;
+        var step = 32;
+        var multi_step = step * 5;
         var start = 0;
         var max = 255;
         var min = 256;
+        var multi_max = max * 5;
         for (var r = start; r <= max; r += step) {
             for (var g = start; g <= max; g += step) {
                 for (var b = start; b <= max; b += step) {
-                    if ((r + g + b) >= min && (r + g + b) < 999 && (r != g || r != b || b != b)) {
+                    var deltas = Math.abs(r - g) +
+                        Math.abs(r - b) +
+                        Math.abs(b - g);
+                    var sum = r + g + b;
+                    if ((r + g + b) >= min && sum < multi_max && (deltas > multi_step)) {
                         this.colors.push("rgb(" + r + "," + g + "," + b + ")");
                     }
                 }

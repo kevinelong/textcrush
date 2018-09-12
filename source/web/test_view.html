@@ -1,0 +1,40 @@
+<script src="../game/classes/model/Util.js"></script>
+<script src="../game/classes/view/Point.js"></script>
+<script src="../game/classes/view/Spacing.js"></script>
+<script src="../game/classes/view/ViewElement.js"></script>
+<script src="../game/classes/view/TextElement.js"></script>
+<script src="../game/classes/view/ButtonElement.js"></script>
+<script src="../game/classes/view/View.js"></script>
+<script>
+
+    document.addEventListener("DOMContentLoaded", function () {
+        let c = document.createElement("canvas");
+
+        c.setAttribute("width", window.innerWidth.toString());
+        c.setAttribute("height", window.innerHeight.toString());
+
+        document.body.style.margin = "0";
+        document.body.appendChild(c);
+
+        let v = new View(c);
+
+        v.add(new TextElement(v, "Now is the time for all good people to come to the aid of their party."));
+        v.add(new ButtonElement(v, "<- Menu", "#336699"));
+        v.add(new ButtonElement(v, "Restart Level", "#ff9933"));
+        v.add(new ButtonElement(v, "Next Level","#339966"));
+        v.add(new TextElement(v, "MWMWM{}[]\|~`,.yg"));
+        v.add(new TextElement(v, "ygyg{}[]\|~`,.MWMW"));
+        v.add(new TextElement(v, "MWMWM{}[]\|~`,.yg"));
+
+        console.log("draw");
+        v.draw();
+        setTimeout(function(){
+            console.log("clear");
+            v.background();
+            setTimeout(function(){
+                console.log("redraw");
+                v.draw();
+            },1000)
+        },2000)
+    });
+</script>

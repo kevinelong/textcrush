@@ -27,14 +27,52 @@
 
             c.removeEventListener('click', initialize);
 
-            let g = new Game(7, 7);
+            let g = new Game(9, 4);
             let d = new Display(c, g);
 
 
             function gameOver() {
+                let high_score_key = "high_score";
+
                 c.removeEventListener('click', onClick);
-                d.showGameOver();
+                let message = "Game Over";
+
+                let high_score = localStorage.getItem(high_score_key);
+
+                if (g.score > high_score) {
+                    localStorage.setItem(high_score_key, g.score);
+                    message += "\nNew High Score!!!\n" +
+                        Display.addCommas(g.score.toString());
+                } else {
+                    localStorage.setItem(high_score_key, g.score);
+                    message += "\nPrevious High Score:\n" +
+                        Display.addCommas(high_score);
+                }
+
+
+                d.showGameOver(message);
+
+                g = null;
+                d = null;
+
                 c.addEventListener('click', initialize);
+            }
+
+            function play(context, frequency, duration) {
+
+                let o = context.createOscillator();
+                let g = context.createGain();
+
+                o.connect(g);
+                g.connect(context.destination);
+
+                g.gain.exponentialRampToValueAtTime(
+                    0.00001, context.currentTime + duration
+                );
+
+                o.frequency.value = frequency;
+                o.start();
+
             }
 
             function onClick(e) {
@@ -42,10 +80,6 @@
                 let delay = 150;
 
                 let values = d.onClick(e.x, e.y);
-                if (g.movesUsed >= g.movesAvailable) {
-                    gameOver();
-                    return;
-                }
 
                 let neighbors = values["neighbors"];
 
@@ -62,37 +96,34 @@
                         notes.push(440 + (60 * i));
                     }
 
-                    let duration = noteLength;
-
-                    function play(frequency) {
-                        let o = context.createOscillator();
-                        let g = context.createGain();
-                        o.connect(g);
-                        g.connect(context.destination);
-                        g.gain.exponentialRampToValueAtTime(
-                            0.00001, context.currentTime + duration
-                        );
-                        o.frequency.value = frequency;
-                        o.start();
-                    }
-
                     for (let i = 0; i < notes.length; i++) {
                         setTimeout(function () {
-                            play(notes[i]);
+                            play(context, notes[i], noteLength);
                         }, noteLength * i * 1000);
                     }
 
 
+                }
+
+                setTimeout(function () {
+
+                    d.draw();
+
                     setTimeout(function () {
+
+                        g.moveDown();
                         d.draw();
 
                         setTimeout(function () {
-                            g.moveDown();
-                            d.draw();
 
-                        }, delay);
+                            if (g.movesUsed >= g.movesAvailable) {
+                                gameOver();
+                            }
+
+                        }, delay / 2);
                     }, delay);
-                }
+                }, delay);
+
             }
 
             c.addEventListener('click', onClick);
@@ -102,19 +133,22 @@
 
         initialize();
 
-        (function() {
+        (function () {
             window.addEventListener("resize", resizeThrottler, false);
             let resizeTimeout = null;
+
             function resizeThrottler() {
-                if ( !resizeTimeout ) {
-                    resizeTimeout = setTimeout(function() {
+                if (!resizeTimeout) {
+                    resizeTimeout = setTimeout(function () {
                         resizeTimeout = null;
                         debugger;
                         d.draw();
                     }, 66);
                 }
             }
-        }());    });
+        }());
+    })
+    ;
 
 
 </script>

@@ -45,13 +45,18 @@ class Display {
         };
     }
 
-
     setFont() {
         this.font_pixels = Math.floor(0.75 * this.scoreHeight);
         this.context.font = "bold " + this.font_pixels + "px Arial";
     }
 
+    setFontSmall() {
+        this.font_pixels = Math.floor(0.25 * this.scoreHeight);
+        this.context.font = "bold " + this.font_pixels + "px Arial";
+    }
+
     topCenterText(s: string) {
+        this.setFont();
         let c = this.context;
         c.textAlign = "center";
         c.lineWidth = 3.5;
@@ -70,21 +75,21 @@ class Display {
         c.lineWidth = 3.5;
         c.strokeStyle = "#ffeecc";
         c.fillStyle = "#333333";
-        let y = this.font_pixels * 3;
+        let y = this.canvas.height / 2 - this.font_pixels / 2;
 
         c.strokeText(s, this.half_width, y);
         c.fillText(s, this.half_width, y);
     }
 
     bottomCenterText(s: string) {
-
+        this.setFont();
         let c = this.context;
 
         c.textAlign = "center";
         c.lineWidth = 3.5;
         c.strokeStyle = "#ffeecc";
         c.fillStyle = "#333333";
-        let y = this.font_pixels * 5;
+        let y = this.canvas.height - this.step;
 
         c.strokeText(s, this.half_width, y);
         c.fillText(s, this.half_width, y);
@@ -105,9 +110,9 @@ class Display {
         return o;
     }
 
-    showGameOver() {
-        this.clearBackGround();
-        this.middleCenterText("Game Over");
+    showGameOver(message:string) {
+        this.shadeBackGround();
+        this.middleCenterText(message);
         this.bottomCenterText("Tap to Continue");
         this.updateScore();
     }
@@ -128,6 +133,7 @@ class Display {
     }
 
     topLeftText(s: string) {
+        this.setFont();
         let c = this.context;
 
         c.textAlign = "left";
@@ -138,14 +144,23 @@ class Display {
     }
 
     updateMovesAvailable() {
+        this.setFontSmall();
         let m = this.game.movesAvailable - this.game.movesUsed;
-        this.topLeftText(m.toString());
+        this.topLeftText(m.toString() + " turns");
     }
 
     clearBackGround() {
         let c = this.context;
         c.fillStyle = "#221100";
         c.fillRect(0, 0, this.width, this.height);
+    }
+
+    shadeBackGround() {
+        let c = this.context;
+        c.fillStyle = "#221100";
+        c.globalAlpha = 0.70;
+        c.fillRect(0, 0, this.width, this.height);
+        c.globalAlpha = 1;
     }
 
     draw() {

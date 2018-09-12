@@ -146,8 +146,7 @@ class Tile {
         c.globalAlpha = 0.8;
         c.textAlign = "center";
 
-        let mt = c.measureText(s);
-        let x = Math.floor(cx + ((step - padding/2)/2);
+        let x = Math.floor(cx + ((step - padding/2)/2));
         let y = Math.ceil(cy + (step * 0.75));
 
         c.strokeText(s, x, y);
@@ -157,7 +156,6 @@ class Tile {
     }
 
     public draw() {
-        let c = this.display.context;
 
         if (-1 === this.position.value) {
             this.clear();

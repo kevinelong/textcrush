@@ -29,15 +29,28 @@ class Game {
         this.populate();
     }
 
+
     initColors() {
-        let step = 8;
+
+        let step = 32;
+        let multi_step = step * 5;
         let start = 0;
         let max = 255;
         let min = 256;
+        let multi_max = max * 5;
+
         for (let r = start; r <= max; r += step) {
             for (let g = start; g <= max; g += step) {
                 for (let b = start; b <= max; b += step) {
-                    if ((r + g + b) >= min && (r + g + b) < 999 && (r != g || r != b || b != b)) {
+
+                    let deltas =
+                        Math.abs(r - g) +
+                        Math.abs(r - b) +
+                        Math.abs(b - g);
+
+                    let sum = r+g+b;
+
+                    if ((r + g + b) >= min && sum < multi_max && (deltas > multi_step)) {
                         this.colors.push("rgb(" + r + "," + g + "," + b + ")");
                     }
                 }

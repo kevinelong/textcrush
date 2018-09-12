@@ -66,7 +66,6 @@ var Tile = (function () {
         c.font = "bolder " + ((step - padding) * 0.75) + "px Arial";
         c.globalAlpha = 0.8;
         c.textAlign = "center";
-        var mt = c.measureText(s);
         var x = Math.floor(cx + ((step - padding / 2) / 2));
         var y = Math.ceil(cy + (step * 0.75));
         c.strokeText(s, x, y);
@@ -74,7 +73,6 @@ var Tile = (function () {
         c.globalAlpha = 1;
     };
     Tile.prototype.draw = function () {
-        var c = this.display.context;
         if (-1 === this.position.value) {
             this.clear();
         }
