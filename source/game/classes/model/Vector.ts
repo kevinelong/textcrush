@@ -1,0 +1,3 @@
+class Vector extends Coordinate{
+
+}

@@ -1,4 +1,4 @@
-class Symbol {
+class Symbol{
     public value: number;
     public character: string;
 
@@ -7,7 +7,7 @@ class Symbol {
 
     public color: string;
 
-    constructor(value: number = -1, character: string = ' ', color: string = 'red') {
+    constructor(value: number = -1, character: string = ' ', color: string = 'white') {
         this.value = value;
         this.character = character;
         this.color = color;

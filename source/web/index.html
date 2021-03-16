@@ -4,6 +4,7 @@
 <script src="../game/classes/model/Position.js"></script>
 <script src="../game/classes/model/Board.js"></script>
 <script src="../game/classes/model/Game.js"></script>
+<script src="../game/classes/model/Sprite.js"></script>
 <script src="../game/classes/view/Tile.js"></script>
 <script src="../game/classes/view/Display.js"></script>
 <script>
@@ -27,7 +28,7 @@
 
             c.removeEventListener('click', initialize);
 
-            let g = new Game(9, 4);
+            let g = new Game(8, 8);
             let d = new Display(c, g);
 
 
@@ -44,7 +45,6 @@
                     message += "\nNew High Score!!!\n" +
                         Display.addCommas(g.score.toString());
                 } else {
-                    localStorage.setItem(high_score_key, g.score);
                     message += "\nPrevious High Score:\n" +
                         Display.addCommas(high_score);
                 }

@@ -32,12 +32,12 @@ class Game {
 
     initColors() {
 
-        let step = 32;
-        let multi_step = step * 5;
+        let step = 8;
+        let multi_step = step * 3;
         let start = 0;
         let max = 255;
         let min = 256;
-        let multi_max = max * 5;
+        // let multi_max = max * 5;
 
         for (let r = start; r <= max; r += step) {
             for (let g = start; g <= max; g += step) {
@@ -48,9 +48,9 @@ class Game {
                         Math.abs(r - b) +
                         Math.abs(b - g);
 
-                    let sum = r+g+b;
+                    // let sum = r + g + b;
 
-                    if ((r + g + b) >= min && sum < multi_max && (deltas > multi_step)) {
+                    if ((r + g + b) >= min && (deltas > multi_step)) {
                         this.colors.push("rgb(" + r + "," + g + "," + b + ")");
                     }
                 }
@@ -72,7 +72,9 @@ class Game {
 
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                this.board.setPosition(x, y, this.getRandomSymbol());
+                let s = this.getRandomSymbol();
+                s.color = this.colors[y * size + x];
+                this.board.setPosition(x, y, s);
             }
         }
     }
@@ -86,19 +88,19 @@ class Game {
         let index = 0;
 
         for (let c = 0; c < 10; c++) {
-            this.symbols.push(new Symbol(index++, c.toString(), this.colors[index]));
+            this.symbols.push(new Symbol(index++, c.toString()));
         }
 
         let base = "A".charCodeAt(0);
 
         for (let a = 0; a < 26; a++) {
-            this.symbols.push(new Symbol(index++, String.fromCharCode(base + a), this.colors[index]));
+            this.symbols.push(new Symbol(index++, String.fromCharCode(base + a)));
         }
 
         let base_lower = "a".charCodeAt(0);
 
         for (let a = 0; a < 26; a++) {
-            this.symbols.push(new Symbol(index++, String.fromCharCode(base_lower + a), this.colors[index]));
+            this.symbols.push(new Symbol(index++, String.fromCharCode(base_lower + a)));
         }
 
         this.symbols.sort(Game.randomCompare);

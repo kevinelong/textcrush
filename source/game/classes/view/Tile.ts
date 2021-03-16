@@ -7,9 +7,11 @@ class Tile {
     cy: number;
 
     constructor(position: Symbol, board: Board, display: Display) {
+
         this.position = position;
         this.board = board;
         this.display = display;
+
         this.cx = (this.position.x * this.display.step) + this.display.horizontalOffset;
         this.cy = (this.position.y * this.display.step) + this.display.verticalOffset;
         ////console.log(this.cx,this.cy);
