@@ -62,6 +62,7 @@ class TextElement extends ViewElement {
         c.strokeStyle = "black";
         c.lineJoin = "round";
 
+        // @ts-ignore
         c.textAlign = this.align;
 
         c.strokeText(text, this.x, y);

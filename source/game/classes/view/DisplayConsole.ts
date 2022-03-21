@@ -1,7 +1,7 @@
 class DisplayConsole {
 
     public draw(b: Board) {
-        //console.log(this.toString(b));
+        console.log(this.toString(b));
     }
 
     public toString(b: Board) {

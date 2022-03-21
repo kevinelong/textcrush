@@ -90,6 +90,7 @@ class ButtonElement extends ViewElement {
         c.strokeStyle = "black";
         c.lineJoin = "round";
 
+        // @ts-ignore
         c.textAlign = this.align;
         let y = this.y + Math.ceil(this.height * 0.2);
         c.strokeText(this.text, this.x, y);
