@@ -32,14 +32,24 @@
         // A canvas is a bitmap, so give it one backing pixel per device pixel and display it at the
         // css size. Without this a 1080-wide phone at 2.75x drew into a 393 px canvas and stretched
         // it to the screen - soft letters, and small text rasterised at 11 px then blown up.
+        //
+        // The game is square (board plus its score line) and lays itself out from the smaller
+        // viewport dimension, so the canvas is that square, centred: the board fills it exactly, and
+        // a tall phone screen does not leave the board pinned to the top with a void underneath.
         let dpr = window.devicePixelRatio || 1;
+        let side = Math.min(window.innerWidth, window.innerHeight);
 
-        c.setAttribute("width", Math.round(window.innerWidth * dpr).toString());
-        c.setAttribute("height", Math.round(window.innerHeight * dpr).toString());
-        c.style.width = window.innerWidth + "px";
-        c.style.height = window.innerHeight + "px";
+        c.setAttribute("width", Math.round(side * dpr).toString());
+        c.setAttribute("height", Math.round(side * dpr).toString());
+        c.style.width = side + "px";
+        c.style.height = side + "px";
 
         document.body.style.margin = "0";
+        document.body.style.height = "100vh";
+        document.body.style.background = "#221100";
+        document.body.style.display = "flex";
+        document.body.style.alignItems = "center";
+        document.body.style.justifyContent = "center";
         document.body.appendChild(c);
 
         let g = null;
@@ -110,7 +120,11 @@
 
                 let delay = 150;
 
-                let values = d.onClick(e.x, e.y);
+                // The canvas sits in the middle of the page, so a click's viewport coordinates have
+                // to be moved into the canvas before the game can map them to a cell.
+                let bounds = c.getBoundingClientRect();
+
+                let values = d.onClick(e.x - bounds.left, e.y - bounds.top);
 
                 let neighbors = values["neighbors"];
 
