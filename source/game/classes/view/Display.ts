@@ -32,6 +32,9 @@ class Display {
     font_pixels: number;
     half_width: number;
 
+    /** css pixels -> canvas pixels; the canvas is drawn at device density, taps arrive in css px */
+    scale: number = 1;
+
     /** true while tiles are moving; input is ignored until the board is still */
     busy: boolean = false;
 
@@ -59,7 +62,12 @@ class Display {
         this.verticalOffset = this.scoreHeight;
         this.horizontalOffset = (this.width - this.minimum) / 2;
         this.step = ((this.minimum - this.scoreHeight) / this.board.size);
-        this.padding = 1;
+
+        // The canvas carries one backing pixel per device pixel and is displayed at its css size, so
+        // the layout below is in canvas pixels: taps arrive in css pixels and are scaled up, and the
+        // 1px gap between tiles becomes one css pixel rather than one canvas pixel.
+        this.scale = this.canvas.clientWidth > 0 ? this.width / this.canvas.clientWidth : 1;
+        this.padding = Math.max(1, Math.round(this.scale));
 
         this.overlay = this.buildBurstLayer();
         this.hideBurst();
@@ -67,8 +75,8 @@ class Display {
 
     onClick(ex: number, ey: number) {
 
-        let x = Math.floor((ex - this.horizontalOffset) / this.step);
-        let y = Math.floor((ey - this.verticalOffset) / this.step);
+        let x = Math.floor((ex * this.scale - this.horizontalOffset) / this.step);
+        let y = Math.floor((ey * this.scale - this.verticalOffset) / this.step);
 
         if (x < 0 || y < 0 || x >= this.game.size || y >= this.game.size) {
             // The square the game draws in is 9 rows tall: the score line sits in the top one, and a
@@ -381,10 +389,13 @@ class Display {
     burst() {
 
         let rect = this.canvas.getBoundingClientRect();
-        let span = this.game.size * this.step;
 
-        this.overlay.style.left = (rect.left + this.horizontalOffset) + "px";
-        this.overlay.style.top = (rect.top + this.verticalOffset) + "px";
+        // The game's geometry is in canvas pixels; the burst layer is positioned in css pixels.
+        let css = 1 / this.scale;
+        let span = this.game.size * this.step * css;
+
+        this.overlay.style.left = (rect.left + this.horizontalOffset * css) + "px";
+        this.overlay.style.top = (rect.top + this.verticalOffset * css) + "px";
         this.overlay.style.width = span + "px";
         this.overlay.style.height = span + "px";
 

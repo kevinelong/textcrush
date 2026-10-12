@@ -1,5 +1,6 @@
 var Display = (function () {
     function Display(canvas, game) {
+        this.scale = 1;
         this.busy = false;
         this.runToken = 0;
         this.game = game;
@@ -13,13 +14,14 @@ var Display = (function () {
         this.verticalOffset = this.scoreHeight;
         this.horizontalOffset = (this.width - this.minimum) / 2;
         this.step = ((this.minimum - this.scoreHeight) / this.board.size);
-        this.padding = 1;
+        this.scale = this.canvas.clientWidth > 0 ? this.width / this.canvas.clientWidth : 1;
+        this.padding = Math.max(1, Math.round(this.scale));
         this.overlay = this.buildBurstLayer();
         this.hideBurst();
     }
     Display.prototype.onClick = function (ex, ey) {
-        var x = Math.floor((ex - this.horizontalOffset) / this.step);
-        var y = Math.floor((ey - this.verticalOffset) / this.step);
+        var x = Math.floor((ex * this.scale - this.horizontalOffset) / this.step);
+        var y = Math.floor((ey * this.scale - this.verticalOffset) / this.step);
         if (x < 0 || y < 0 || x >= this.game.size || y >= this.game.size) {
             return {
                 "neighbors": {},
@@ -248,9 +250,10 @@ var Display = (function () {
     };
     Display.prototype.burst = function () {
         var rect = this.canvas.getBoundingClientRect();
-        var span = this.game.size * this.step;
-        this.overlay.style.left = (rect.left + this.horizontalOffset) + "px";
-        this.overlay.style.top = (rect.top + this.verticalOffset) + "px";
+        var css = 1 / this.scale;
+        var span = this.game.size * this.step * css;
+        this.overlay.style.left = (rect.left + this.horizontalOffset * css) + "px";
+        this.overlay.style.top = (rect.top + this.verticalOffset * css) + "px";
         this.overlay.style.width = span + "px";
         this.overlay.style.height = span + "px";
         this.overlay.className = "tc-burst";

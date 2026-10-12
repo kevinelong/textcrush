@@ -118,12 +118,14 @@ class Tile {
 
         let s = this.position.character;
 
-        c.fillStyle = "rgb(255,255,255)";
+        // Warm white clears 4.5:1 on every one of the eight tile colours, so the letter is legible on
+        // its own; the thin dark rim is there to give the candy an edge, not to rescue the letter.
+        c.fillStyle = "rgb(255,244,230)";
         c.strokeStyle = "rgb(0,0,0)";
-        c.lineWidth = 4.5;
+        c.lineWidth = 2;
         c.font = "bolder " + ((step - padding) * 0.75) + "px Arial";
 
-        c.globalAlpha = 0.8;
+        c.globalAlpha = 1;
         c.textAlign = "center";
 
         let x = Math.floor(cx + ((step - padding/2)/2));

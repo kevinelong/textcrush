@@ -61,18 +61,18 @@ class Game:
         self.populate()
 
     def initColors(self):
-        step = 8
-        multi_step = step * 3
-        start = 0
-        max = 255
-        min = 256
-        for r in range(0, max, step):
-            for g in range(start, max, step):
-                for b in range(start, max, step):
-                    deltas = abs(r - g) + abs(r - b) + abs(b - g)
-                    if ((r + g + b) >= min and (deltas > multi_step)):
-                        self.colors.append("rgb(" + str(r) + "," + str(g) + "," + str(b) + ")")
-        random.shuffle(self.colors)
+        # The eight tile colours, in the order they are handed to the symbols in play - the same set
+        # the TypeScript model uses. This port prints text only, but the palette stays in step.
+        self.colors = [
+            "rgb(178,44,78)",
+            "rgb(180,85,26)",
+            "rgb(138,108,16)",
+            "rgb(76,122,34)",
+            "rgb(30,122,94)",
+            "rgb(31,110,156)",
+            "rgb(59,75,181)",
+            "rgb(119,64,158)",
+        ]
 
     def getRandomSymbol(self):
         r = random.randint(0, self.variations)

@@ -18,37 +18,20 @@ var Game = (function () {
         this.populate();
     }
     Game.prototype.initColors = function () {
-        var step = 8;
-        var multi_step = step * 3;
-        var start = 0;
-        var max = 255;
-        var min = 256;
-        for (var r = start; r <= max; r += step) {
-            for (var g = start; g <= max; g += step) {
-                for (var b = start; b <= max; b += step) {
-                    var deltas = Math.abs(r - g) +
-                        Math.abs(r - b) +
-                        Math.abs(b - g);
-                    if ((r + g + b) >= min && (deltas > multi_step)) {
-                        this.colors.push("rgb(" + r + "," + g + "," + b + ")");
-                    }
-                }
-            }
+        this.colors = [];
+        for (var i = 0; i < Game.palette.length; i++) {
+            this.colors.push(Game.palette[i]);
         }
-        this.colors.sort(Game.randomCompare);
     };
     Game.prototype.getRandomSymbol = function () {
         var r = Util.getRandomInteger(this.variations);
-        var s = this.symbols[r];
         return this.symbols[r];
     };
     Game.prototype.populate = function () {
         var size = this.size;
         for (var y = 0; y < size; y++) {
             for (var x = 0; x < size; x++) {
-                var s = this.getRandomSymbol();
-                s.color = this.colors[y * size + x];
-                this.board.setPosition(x, y, s);
+                this.board.setPosition(x, y, this.getRandomSymbol());
             }
         }
     };
@@ -69,6 +52,9 @@ var Game = (function () {
             this.symbols.push(new Symbol(index++, String.fromCharCode(base_lower + a)));
         }
         this.symbols.sort(Game.randomCompare);
+        for (var i = 0; i < this.symbols.length; i++) {
+            this.symbols[i].color = this.colors[i % this.colors.length];
+        }
     };
     Game.prototype.moveDown = function () {
         var moved = 0;
@@ -146,6 +132,16 @@ var Game = (function () {
             this.movesUsed++;
         }
     };
+    Game.palette = [
+        "rgb(178,44,78)",
+        "rgb(180,85,26)",
+        "rgb(138,108,16)",
+        "rgb(76,122,34)",
+        "rgb(30,122,94)",
+        "rgb(31,110,156)",
+        "rgb(59,75,181)",
+        "rgb(119,64,158)"
+    ];
     return Game;
 }());
 //# sourceMappingURL=Game.js.map

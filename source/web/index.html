@@ -1,3 +1,14 @@
+<!-- The game draws its own chrome, so the page is a full-bleed canvas: device-width, no zoom, and
+     (for iOS) under the safe areas, which the wrapper keeps its square clear of. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#221100">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Text Crush">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+
 <script src="../game/classes/model/Util.js"></script>
 <script src="../game/classes/model/Symbol.js"></script>
 <script src="../game/classes/model/Neighbor.js"></script>
@@ -18,8 +29,15 @@
 
         let c = document.createElement("canvas");
 
-        c.setAttribute("width", window.innerWidth.toString());
-        c.setAttribute("height", window.innerHeight.toString());
+        // A canvas is a bitmap, so give it one backing pixel per device pixel and display it at the
+        // css size. Without this a 1080-wide phone at 2.75x drew into a 393 px canvas and stretched
+        // it to the screen - soft letters, and small text rasterised at 11 px then blown up.
+        let dpr = window.devicePixelRatio || 1;
+
+        c.setAttribute("width", Math.round(window.innerWidth * dpr).toString());
+        c.setAttribute("height", Math.round(window.innerHeight * dpr).toString());
+        c.style.width = window.innerWidth + "px";
+        c.style.height = window.innerHeight + "px";
 
         document.body.style.margin = "0";
         document.body.appendChild(c);
@@ -160,6 +178,12 @@
                 }
             }
         }());
+        // Offline shell: after the first visit the game runs from the cache, which is what makes it
+        // installable (Add to Home Screen) and playable on a plane. The worker lives one directory up
+        // because its scope has to cover the engine in ../game/ as well as this page.
+        if ("serviceWorker" in navigator && "file:" !== location.protocol) {
+            navigator.serviceWorker.register("../sw.js");
+        }
     })
     ;
 

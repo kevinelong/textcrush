@@ -44,40 +44,35 @@ class Game {
     }
 
 
+    /**
+     * The eight tile colours, in the order they are handed to the symbols in play.
+     *
+     * Chosen, not sampled. This used to generate 26,640 colours on a step-8 RGB lattice and draw
+     * eight of them per game, so 93% of boards held a pair closer than dE 20 (42% closer than dE 10)
+     * and lightness ran from near-black to near-white. Measured on this set: every pair is at least
+     * dE 20.5 apart, they hold one band of lightness, and one warm-white ink reads on all eight
+     * (4.5:1 or better), so the colour is a second reading of the letter rather than decoration.
+     */
+    private static palette: Array<string> = [
+        "rgb(178,44,78)",
+        "rgb(180,85,26)",
+        "rgb(138,108,16)",
+        "rgb(76,122,34)",
+        "rgb(30,122,94)",
+        "rgb(31,110,156)",
+        "rgb(59,75,181)",
+        "rgb(119,64,158)"
+    ];
+
     initColors() {
-
-        let step = 8;
-        let multi_step = step * 3;
-        let start = 0;
-        let max = 255;
-        let min = 256;
-        // let multi_max = max * 5;
-
-        for (let r = start; r <= max; r += step) {
-            for (let g = start; g <= max; g += step) {
-                for (let b = start; b <= max; b += step) {
-
-                    let deltas =
-                        Math.abs(r - g) +
-                        Math.abs(r - b) +
-                        Math.abs(b - g);
-
-                    // let sum = r + g + b;
-
-                    if ((r + g + b) >= min && (deltas > multi_step)) {
-                        this.colors.push("rgb(" + r + "," + g + "," + b + ")");
-                    }
-                }
-            }
+        this.colors = [];
+        for (let i = 0; i < Game.palette.length; i++) {
+            this.colors.push(Game.palette[i]);
         }
-        this.colors.sort(Game.randomCompare);
-
     }
 
     getRandomSymbol() {
         let r = Util.getRandomInteger(this.variations);
-        let s = this.symbols[r];
-//	s.color = this.colors[Util.getRandomInteger(this.colors.length)];
         return this.symbols[r];
     }
 
@@ -86,9 +81,7 @@ class Game {
 
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                let s = this.getRandomSymbol();
-                s.color = this.colors[y * size + x];
-                this.board.setPosition(x, y, s);
+                this.board.setPosition(x, y, this.getRandomSymbol());
             }
         }
     }
@@ -118,6 +111,13 @@ class Game {
         }
 
         this.symbols.sort(Game.randomCompare);
+
+        // Colour lives on the symbol and is fixed for the whole game: eight symbols in play, eight
+        // colours, so a colour always means the same letter - including for the tiles that refill
+        // from the top, which draw from this same set.
+        for (let i = 0; i < this.symbols.length; i++) {
+            this.symbols[i].color = this.colors[i % this.colors.length];
+        }
     }
 
 
