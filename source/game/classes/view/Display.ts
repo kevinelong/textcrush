@@ -620,7 +620,11 @@ class Display {
 
         let token = ++this.runToken;
         let started = -1;
-        let duration = 90;
+
+        // 45 ms: the squash is meant to be felt, not watched. At 90 ms it read as a slow bob rather
+        // than the board landing, and the amplitude below is unchanged, so this is the same bounce
+        // at twice the speed.
+        let duration = 45;
 
         let frame = (now: number) => {
 

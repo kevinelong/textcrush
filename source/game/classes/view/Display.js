@@ -354,7 +354,7 @@ var Display = (function () {
         }
         var token = ++this.runToken;
         var started = -1;
-        var duration = 90;
+        var duration = 45;
         var frame = function (now) {
             if (token !== _this.runToken) {
                 return;
