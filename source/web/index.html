@@ -44,12 +44,17 @@
         c.style.width = side + "px";
         c.style.height = side + "px";
 
+        // Positioned by hand rather than with flex centring: inside the Android web view a
+        // `height: 100vh` flex body put the canvas at y = -196 instead of y = 0, so the board fell
+        // off the top of the screen. Integer offsets also avoid a half-pixel transform, which would
+        // resample the canvas and undo the point of drawing it at device density.
+        c.style.display = "block";
+        c.style.position = "absolute";
+        c.style.left = Math.round((window.innerWidth - side) / 2) + "px";
+        c.style.top = Math.round((window.innerHeight - side) / 2) + "px";
+
         document.body.style.margin = "0";
-        document.body.style.height = "100vh";
         document.body.style.background = "#221100";
-        document.body.style.display = "flex";
-        document.body.style.alignItems = "center";
-        document.body.style.justifyContent = "center";
         document.body.appendChild(c);
 
         let g = null;
