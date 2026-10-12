@@ -67,10 +67,23 @@ class Display {
 
     onClick(ex: number, ey: number) {
 
-        this.busy = true;
-
         let x = Math.floor((ex - this.horizontalOffset) / this.step);
         let y = Math.floor((ey - this.verticalOffset) / this.step);
+
+        if (x < 0 || y < 0 || x >= this.game.size || y >= this.game.size) {
+            // The square the game draws in is 9 rows tall: the score line sits in the top one, and a
+            // tap on the last pixel row lands just past the board. Those taps index nothing, so
+            // ignore them - and in particular do not latch busy, which would freeze the board for
+            // good, since every later tap is dropped while busy is set.
+            return {
+                "neighbors": {},
+                "x": x,
+                "y": y
+            };
+        }
+
+        this.busy = true;
+
         let neighbors = {};
         this.game.onRemove(x, y, neighbors);
         this.draw();

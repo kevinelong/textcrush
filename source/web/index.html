@@ -96,6 +96,10 @@
 
                 let neighbors = values["neighbors"];
 
+                if (Object.keys(neighbors).length === 0) {
+                    return;
+                }
+
                 if (AudioContext) {
 
                     let count = Object.keys(neighbors).length;

@@ -18,9 +18,16 @@ var Display = (function () {
         this.hideBurst();
     }
     Display.prototype.onClick = function (ex, ey) {
-        this.busy = true;
         var x = Math.floor((ex - this.horizontalOffset) / this.step);
         var y = Math.floor((ey - this.verticalOffset) / this.step);
+        if (x < 0 || y < 0 || x >= this.game.size || y >= this.game.size) {
+            return {
+                "neighbors": {},
+                "x": x,
+                "y": y
+            };
+        }
+        this.busy = true;
         var neighbors = {};
         this.game.onRemove(x, y, neighbors);
         this.draw();
