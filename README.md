@@ -6,6 +6,24 @@ tiles above fall down to fill the gap.
 **Play it:** <https://kevinelong.github.io/textcrush/> — it installs to a phone home screen
 (Share → Add to Home Screen on iOS, or the install prompt on Android) and then runs offline.
 
+## What it looks like
+
+The board, with the score, the turns in their own colour, and a bar that drains as they go. A tap
+clears the letter and every match joined to it; the tiles above fall in and the score counts up
+rather than jumping:
+
+![The board](docs/board.png)
+
+The last turn of a game, the end card arriving, the prompt pulsing, and the next board being dealt:
+
+![Play](docs/play.gif)
+
+![How to play](docs/rules.png)
+
+![Game Over](docs/card.png)
+
+Every image here is a capture of the game running, not a mock-up.
+
 ## How it plays
 
 - The board is 8×8, drawn from 8 distinct letters and digits.
