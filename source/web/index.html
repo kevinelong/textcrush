@@ -86,9 +86,9 @@
         (function () {
             let style = document.createElement("style");
             style.textContent =
-                "#board-mirror,#board-status{position:absolute;width:1px;height:1px;overflow:hidden;"
-                + "clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}"
-                + "#board-mirror button{width:1px;height:1px}";
+                "#board-mirror,#board-status,#help-text,#help-button{position:absolute;width:1px;height:1px;"
+                + "overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}"
+                + "#board-mirror button,#help-button{width:1px;height:1px}";
             document.head.appendChild(style);
         }());
 
@@ -163,6 +163,48 @@
 
         buildMirror();
 
+        // The rules as real text, and a way to ask for them, for a screen reader or a keyboard. The
+        // game itself has no words on screen until the rules are opened, so this is also the only
+        // place a screen reader can read them.
+        let helpText = document.createElement("p");
+        helpText.id = "help-text";
+        helpText.textContent = "Tap a letter to clear it and the matching letters joined to it. "
+            + "A run of 2 scores 2, of 4 scores 8, of 8 scores 128. You have 20 turns and each clear "
+            + "spends one. Your best is kept on this device.";
+
+        let helpButton = document.createElement("button");
+        helpButton.id = "help-button";
+        helpButton.type = "button";
+        helpButton.textContent = "How to play";
+        helpButton.addEventListener("click", function () {
+            window.setTextCrushHelp(true);
+        });
+
+        document.body.appendChild(helpText);
+        document.body.appendChild(helpButton);
+
+        let HELP_KEY = "seen-help";
+
+        function helpSeen() {
+            return localStorage.getItem(HELP_KEY) !== null;
+        }
+
+        // The wrapper's "?" button calls this, and so does the game's own "?" beside the sound toggle.
+        window.setTextCrushHelp = function (show) {
+
+            localStorage.setItem(HELP_KEY, "1");
+
+            if (!d) {
+                return;
+            }
+
+            if (show) {
+                d.showHelp();
+            } else {
+                d.hideHelp();
+            }
+        };
+
         // The in-progress game is kept here, so a restart resumes the board instead of dealing a new
         // one. The high score has its own key and is never touched by this.
         let SAVE_KEY = "game-state";
@@ -192,6 +234,7 @@
             let state = {
                 score: g.score,
                 turns: g.movesAvailable - g.movesUsed,
+                total: g.movesAvailable,
                 best: parseInt(localStorage.getItem("high_score") || "0", 10) || 0,
                 muted: muted
             };
@@ -300,9 +343,27 @@
                 }
 
                 g = null;
-                d = null;
 
-                c.addEventListener('click', initialize);
+                // the display stays until the card has left, so the exit can be animated
+                c.addEventListener('click', restart);
+            }
+
+            /** the card leaves first, then the next game is dealt */
+            function restart() {
+
+                c.removeEventListener('click', restart);
+
+                let leaving = d;
+
+                if (leaving === null) {
+                    initialize();
+                    return;
+                }
+
+                leaving.playCardExit(function () {
+                    d = null;
+                    initialize();
+                });
             }
 
             function play(context, frequency, duration) {
@@ -384,6 +445,7 @@
                             updateMirror();
                             saveState();
                             report();
+                            d.pulseTurns();
 
                             if (g.movesUsed >= g.movesAvailable) {
                                 gameOver();
@@ -408,6 +470,11 @@
                 let x = e.x - bounds.left;
                 let y = e.y - bounds.top;
 
+                if (d.hitHelp(x, y)) {
+                    window.setTextCrushHelp(true);
+                    return;
+                }
+
                 if (d.hitMute(x, y)) {
                     window.setTextCrushMuted(!muted);
                     return;
@@ -424,6 +491,12 @@
                 c.addEventListener('pointerup', releaseHandler);
                 c.addEventListener('pointercancel', releaseHandler);
                 c.addEventListener('pointerleave', releaseHandler);
+
+                // Nothing on screen says what to do, so the rules are shown once - on a fresh install
+                // only, and never over a resumed game.
+                if (!helpSeen()) {
+                    window.setTextCrushHelp(true);
+                }
             });
         }
 

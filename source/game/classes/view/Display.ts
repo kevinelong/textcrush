@@ -65,6 +65,27 @@ class Display {
     private removed: Array<RemovedTile> = [];
 
     private floaters: Array<Floater> = [];
+
+    /** when the turn counter last changed, for its swell */
+    private turnPulseAt: number = 0;
+
+    /** true while the fading-effects loop is running, so asking for it again does not restart it */
+    private effectRunning: boolean = false;
+
+    /** the end card's message and birth, while it is up */
+    private card: { message: string; started: number } = null;
+
+    /** the card animates on its own token, so the effects loop cannot cut it short */
+    private cardToken: number = 0;
+
+    /** how far the card has faded out, 1 while it is fully there */
+    private cardAlpha: number = 1;
+
+    /** the score eases to its new value rather than jumping */
+    private scoreShown: number = 0;
+    private scoreFrom: number = 0;
+    private scoreChangedAt: number = 0;
+    private scoreSeen: number = -1;
     private effectToken: number = 0;
 
     /** set once the game is over, so a fading floater cannot repaint over the end card */
@@ -81,6 +102,20 @@ class Display {
 
     /** the sound toggle drawn in the score line (the web build's control; wrappers have their own) */
     muted: boolean = false;
+
+    /** the rules are up: the next tap closes them rather than playing */
+    helpVisible: boolean = false;
+
+    /** the rules, in the order they are drawn */
+    private static rules: Array<string> = [
+        "Tap a letter to clear it",
+        "and the matching letters",
+        "joined to it.",
+        "A run of 2 scores 2,",
+        "4 scores 8, 8 scores 128.",
+        "Twenty turns, one per clear.",
+        "Your best stays on this device."
+    ];
 
     private overlay: HTMLDivElement;
     private runToken: number = 0;
@@ -142,6 +177,16 @@ class Display {
 
     /** clears the run at a cell; the entry point for the board, the keyboard and a screen reader */
     onClickCell(x: number, y: number) {
+
+        if (this.helpVisible) {
+            // the tap that dismisses the rules is not a move
+            this.hideHelp();
+            return {
+                "neighbors": {},
+                "x": -1,
+                "y": -1
+            };
+        }
 
         this.busy = true;
 
@@ -264,49 +309,8 @@ class Display {
         c.lineJoin = "round";
     }
 
-    middleCenterText(message: string) {
-
-        let c = this.context;
-        let lines = message.split("\n");
-        let big = Math.floor(0.75 * this.scoreHeight);
-        let small = Math.floor(0.42 * this.scoreHeight);
-        let lineHeight = Math.floor(this.scoreHeight * 0.95);
-
-        // The message arrives with newlines in it. Drawn as a single line - which is what this used to
-        // do - a 40-character line at 33 dp ran off both edges of a 393 px square, so the score was
-        // cut off at each end. Stacked, it fits.
-        c.textAlign = "center";
-        this.setInk();
-
-        let y = (this.canvas.height / 2) - ((lineHeight * (lines.length - 1)) / 2);
-
-        for (let i = 0; i < lines.length; i++) {
-
-            if (lines[i].length > 0) {
-                c.font = "bold " + (i === 0 ? big : small) + "px Arial";
-                c.lineWidth = i === 0 ? 6 : 3.5;
-
-                c.strokeText(lines[i], this.half_width, y);
-                c.fillText(lines[i], this.half_width, y);
-            }
-
-            y += lineHeight;
-        }
-    }
-
-    bottomCenterText(s: string) {
-        this.setFont();
-        let c = this.context;
-
-        c.textAlign = "center";
-        this.setInk();
-        let y = this.canvas.height - this.step;
-
-        c.strokeText(s, this.half_width, y);
-        c.fillText(s, this.half_width, y);
-    }
-
     static addCommas(s: string) {
+
         let o = "";
 
         for (let i = s.length - 1; i >= 0; i--) {
@@ -321,23 +325,169 @@ class Display {
         return o;
     }
 
+    /**
+     * The end card.
+     *
+     * Arrives rather than appearing: the dim ramps in over 220 ms, the lines rise and fade in 90 ms
+     * apart with a small overshoot on the title, and the prompt pulses a few times so it reads as
+     * something to tap. It leaves the same way when the next game starts - see playCardExit.
+     */
     showGameOver(message: string) {
 
-        // Nothing may repaint the board after this: the shade and the card are painted once, and a
-        // fading "+16" would otherwise clear them a few frames later.
+        // Nothing may repaint the board after this: the card is drawn from the card's own timeline,
+        // and a fading "+16" would otherwise clear it a few frames later.
         this.finished = true;
         this.floaters = [];
+        this.card = { message: message, started: Date.now() };
 
-        this.shadeBackGround();
-        this.middleCenterText(message);
-        this.bottomCenterText("Tap to Continue");
-        this.updateScore();
+        this.animateCard();
+    }
+
+    /** the card leaving, so the next deal does not snap in on top of it */
+    playCardExit(done: () => void) {
+
+        if (this.card === null) {
+            done();
+            return;
+        }
+
+        this.stopEffects();
+
+        let token = ++this.cardToken;
+        let started = Date.now();
+
+        let frame = () => {
+
+            if (token !== this.cardToken) {
+                return;
+            }
+
+            let p = Math.min(1, (Date.now() - started) / 160);
+
+            this.cardAlpha = 1 - p;
+            this.draw();
+
+            if (p < 1) {
+                requestAnimationFrame(frame);
+                return;
+            }
+
+            this.card = null;
+            this.cardAlpha = 1;
+            done();
+        };
+
+        requestAnimationFrame(frame);
+    }
+
+    private animateCard() {
+
+        this.stopEffects();
+
+        let frame = () => {
+
+            if (this.card === null) {
+                return;
+            }
+
+            this.draw();
+
+            // the prompt pulses for a few beats, then holds still
+            if ((Date.now() - this.card.started) < 4000) {
+                requestAnimationFrame(frame);
+            }
+        };
+
+        this.cardToken++;
+
+        requestAnimationFrame(frame);
+    }
+
+    /** stops the fading-effects loop without touching the card's own timeline */
+    private stopEffects() {
+        this.effectToken++;
+        this.effectRunning = false;
+    }
+
+    private drawCard() {
+
+        let c = this.context;
+        let age = Date.now() - this.card.started;
+        let lines = this.card.message.split("\n");
+        let lineHeight = Math.floor(this.scoreHeight * 0.95);
+        let top = (this.canvas.height / 2) - ((lineHeight * (lines.length - 1)) / 2);
+        let alpha = this.cardAlpha;
+
+        c.fillStyle = "#221100";
+        c.globalAlpha = 0.70 * Math.min(1, age / 220) * alpha;
+        c.fillRect(0, 0, this.width, this.height);
+        c.globalAlpha = 1;
+
+        c.textAlign = "center";
+        this.setInk();
+
+        for (let i = 0; i < lines.length; i++) {
+
+            let arrival = Math.min(1, (age - (i * 90)) / 260);
+
+            if (arrival <= 0) {
+                continue;
+            }
+
+            let eased = 1 - Math.pow(1 - arrival, 3);
+            let size = (i === 0) ? 0.75 : 0.42;
+            // the title comes in with a little overshoot and settles
+            let pop = (i === 0) ? 1 + (0.06 * Math.sin(Math.PI * arrival)) : 1;
+
+            c.font = "bold " + Math.floor(this.scoreHeight * size * pop) + "px Arial";
+            c.lineWidth = (i === 0) ? 6 : 3.5;
+            c.globalAlpha = eased * alpha;
+
+            c.strokeText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * this.scoreHeight * 0.45));
+            c.fillText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * this.scoreHeight * 0.45));
+
+            c.globalAlpha = 1;
+        }
+
+        let promptAt = (lines.length * 90) + 320;
+
+        if (age <= promptAt) {
+            return;
+        }
+
+        let beat = age - promptAt;
+        let pulsing = beat < 3600;
+        let wave = 0.75 + (0.25 * (0.5 + (0.5 * Math.cos(beat / 190))));
+
+        c.font = "bold " + Math.floor(this.scoreHeight * 0.42) + "px Arial";
+        c.lineWidth = 3.5;
+        c.globalAlpha = (pulsing ? wave : 1) * alpha;
+
+        c.strokeText("Tap to Continue", this.half_width, this.canvas.height - this.step);
+        c.fillText("Tap to Continue", this.half_width, this.canvas.height - this.step);
+        c.globalAlpha = 1;
     }
 
     updateScore() {
-        let s = this.game.score.toString();
-        let o = Display.addCommas(s);
-        this.topCenterText(o);
+
+        // The score eases to its new value, so a big clear is felt rather than only read.
+        if (this.scoreSeen !== this.game.score) {
+            this.scoreFrom = this.scoreShown;
+            this.scoreChangedAt = Date.now();
+            this.scoreSeen = this.game.score;
+            this.tickEffects();
+        }
+
+        let age = (Date.now() - this.scoreChangedAt) / 250;
+
+        if (age >= 1) {
+            this.scoreShown = this.game.score;
+        } else {
+            let eased = 1 - Math.pow(1 - age, 2);
+            this.scoreShown = Math.round(this.scoreFrom + ((this.game.score - this.scoreFrom) * eased));
+        }
+
+        this.topCenterText(Display.addCommas(this.scoreShown.toString()));
     }
 
     drawTiles(rows: RowOverrides = null) {
@@ -368,37 +518,110 @@ class Display {
         }
     }
 
-    topLeftText(s: string) {
-        this.setFont();
+    /** how many turns are left */
+    private turnsLeft(): number {
+        return this.game.movesAvailable - this.game.movesUsed;
+    }
+
+    /**
+     * The turn counter's ink, escalating as the turns run out.
+     *
+     * Measured against the board ground: cream 15.98:1, amber 10.16:1, red 7.13:1 - all clear of the
+     * 4.5:1 body-text floor, so "nearly out" is louder without becoming hard to read.
+     */
+    private turnsInk(): string {
+
+        let left = this.turnsLeft();
+
+        if (left <= 2) {
+            return "#ff7a5c";
+        }
+
+        if (left <= 5) {
+            return "#f0b84a";
+        }
+
+        return "#ffeecc";
+    }
+
+    /** a short swell of the turn counter, so a spent turn is not missed */
+    pulseTurns() {
+        this.turnPulseAt = Date.now();
+        this.tickEffects();
+    }
+
+    private turnPulse(): number {
+
+        if (this.turnPulseAt === 0) {
+            return 1;
+        }
+
+        let age = (Date.now() - this.turnPulseAt) / 200;
+
+        if (age >= 1) {
+            return 1;
+        }
+
+        return 1 + (0.22 * Math.sin(Math.PI * age));
+    }
+
+    /**
+     * A bar the width of the board that drains as the turns go.
+     *
+     * The number alone is easy to miss while you are looking at the bubbles; the wrappers draw their
+     * own bar under the header, which is why this one is only drawn when the game owns the score line.
+     */
+    private drawTurnBar() {
+
         let c = this.context;
+        let height = Math.max(2, Math.round(this.scoreHeight * 0.10));
+        let span = this.game.size * this.step;
+        let y = this.verticalOffset - height - 3;
 
-        c.textAlign = "left";
-        // Explicitly, not inherited from whichever text was drawn last.
-        this.setInk();
+        c.fillStyle = "#33200d";
+        c.fillRect(this.horizontalOffset, y, span, height);
 
-        c.strokeText(s.toString(), this.horizontalOffset, this.font_pixels);
-        c.fillText(s.toString(), this.horizontalOffset, this.font_pixels);
-
+        c.fillStyle = this.turnsInk();
+        c.fillRect(this.horizontalOffset, y, span * (this.turnsLeft() / this.game.movesAvailable), height);
     }
 
     updateMovesAvailable() {
+
+        let left = this.turnsLeft();
+        let c = this.context;
+
         this.setFontSmall();
-        let m = this.game.movesAvailable - this.game.movesUsed;
-        this.topLeftText(m.toString() + " turns");
+
+        c.textAlign = "left";
+        c.strokeStyle = "#221100";
+        c.fillStyle = this.turnsInk();
+        c.lineJoin = "round";
+
+        let label = left + (left === 1 ? " turn" : " turns");
+        let x = this.horizontalOffset;
+        let y = this.font_pixels;
+        let scale = this.turnPulse();
+
+        if (scale === 1) {
+            c.strokeText(label, x, y);
+            c.fillText(label, x, y);
+        } else {
+            // scaled about its own left-baseline, so the counter swells where it sits
+            c.save();
+            c.translate(x, y);
+            c.scale(scale, scale);
+            c.strokeText(label, 0, 0);
+            c.fillText(label, 0, 0);
+            c.restore();
+        }
+
+        this.drawTurnBar();
     }
 
     clearBackGround() {
         let c = this.context;
         c.fillStyle = "#221100";
         c.fillRect(0, 0, this.width, this.height);
-    }
-
-    shadeBackGround() {
-        let c = this.context;
-        c.fillStyle = "#221100";
-        c.globalAlpha = 0.70;
-        c.fillRect(0, 0, this.width, this.height);
-        c.globalAlpha = 1;
     }
 
     draw(rows: RowOverrides = null) {
@@ -419,6 +642,15 @@ class Display {
         }
 
         this.drawFloaters();
+
+        if (this.card !== null) {
+            this.drawCard();
+        }
+
+        // last, so the rules are never painted over by a fading score
+        if (this.helpVisible) {
+            this.drawHelp();
+        }
     }
 
     /** where the sound toggle sits: a square at the right end of the score line */
@@ -470,6 +702,87 @@ class Display {
             c.strokeStyle = "#ffeecc";
             c.stroke();
         }
+
+        // and the rules button beside it
+        let help = this.helpBox();
+        let hx = help[0] + (size / 2);
+
+        c.strokeText("?", hx, cy);
+        c.fillText("?", hx, cy);
+    }
+
+    /** where the rules button sits: the square beside the sound toggle */
+    private helpBox(): Array<number> {
+
+        let size = this.scoreHeight;
+
+        return [this.width - (2 * size), 0, size, size];
+    }
+
+    /** true when a css-space point is on the rules button */
+    hitHelp(ex: number, ey: number): boolean {
+
+        if (!this.showHud) {
+            return false;
+        }
+
+        let box = this.helpBox();
+        let x = ex * this.scale;
+        let y = ey * this.scale;
+
+        return x >= box[0] && x <= (box[0] + box[2]) && y >= box[1] && y <= (box[1] + box[3]);
+    }
+
+    showHelp() {
+        this.helpVisible = true;
+        this.draw();
+    }
+
+    hideHelp() {
+        this.helpVisible = false;
+        this.draw();
+    }
+
+    /**
+     * The rules, over a dimmed board.
+     *
+     * The game is one screen with no words on it until this, so the rules are shown once on a fresh
+     * install (see index.html) and afterwards live behind the "?" beside the sound toggle.
+     */
+    private drawHelp() {
+
+        let c = this.context;
+        let title = Math.floor(0.75 * this.scoreHeight);
+        let body = Math.floor(0.40 * this.scoreHeight);
+        let lineHeight = Math.floor(0.62 * this.scoreHeight);
+
+        c.fillStyle = "#221100";
+        c.globalAlpha = 0.90;
+        c.fillRect(0, 0, this.width, this.height);
+        c.globalAlpha = 1;
+
+        c.textAlign = "center";
+        this.setInk();
+
+        c.font = "bold " + title + "px Arial";
+        c.lineWidth = 5;
+        c.strokeText("How to play", this.half_width, this.width * 0.20);
+        c.fillText("How to play", this.half_width, this.width * 0.20);
+
+        c.font = "bold " + body + "px Arial";
+        c.lineWidth = 3.5;
+
+        let y = this.width * 0.34;
+
+        for (let i = 0; i < Display.rules.length; i++) {
+            c.strokeText(Display.rules[i], this.half_width, y);
+            c.fillText(Display.rules[i], this.half_width, y);
+            y += lineHeight;
+        }
+
+        c.font = "bold " + body + "px Arial";
+        c.strokeText("Tap anywhere to play", this.half_width, this.width * 0.93);
+        c.fillText("Tap anywhere to play", this.half_width, this.width * 0.93);
     }
 
     /** a keyboard or screen-reader user moved to a cell: ring it, so sighted keyboard users can see */
@@ -750,24 +1063,37 @@ class Display {
     /** keeps drawing while anything is still fading, without holding up the next tap */
     private tickEffects() {
 
+        // Asking again from inside a frame (a score change is noticed while drawing) must not restart
+        // the loop: restarting bumps the token, which is what the running frame checks to stop.
+        if (this.effectRunning) {
+            return;
+        }
+
+        this.effectRunning = true;
+
         let token = ++this.effectToken;
 
         let frame = () => {
 
-            if (token !== this.effectToken || this.finished) {
+            if (token !== this.effectToken) {
+                this.effectRunning = false;
                 return;
             }
 
             if (this.busy) {
                 // an animation is drawing these frames already, and calls back here when it finishes
+                this.effectRunning = false;
                 return;
             }
 
             this.draw();
 
-            if (this.floaters.length > 0) {
+            if (this.floaters.length > 0 || this.turnPulse() !== 1 || this.scoreShown !== this.game.score) {
                 requestAnimationFrame(frame);
+                return;
             }
+
+            this.effectRunning = false;
         };
 
         requestAnimationFrame(frame);
@@ -814,6 +1140,9 @@ class Display {
     /** drops the running animation; its completion callback is not called */
     stop() {
         this.runToken++;
+        this.stopEffects();
+        this.cardToken++;
+        this.card = null;
         this.busy = false;
     }
 

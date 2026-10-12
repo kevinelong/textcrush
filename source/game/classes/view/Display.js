@@ -6,12 +6,22 @@ var Display = (function () {
         this.pressed = null;
         this.removed = [];
         this.floaters = [];
+        this.turnPulseAt = 0;
+        this.effectRunning = false;
+        this.card = null;
+        this.cardToken = 0;
+        this.cardAlpha = 1;
+        this.scoreShown = 0;
+        this.scoreFrom = 0;
+        this.scoreChangedAt = 0;
+        this.scoreSeen = -1;
         this.effectToken = 0;
         this.finished = false;
         this.focused = null;
         this.reduceMotion = false;
         this.showHud = true;
         this.muted = false;
+        this.helpVisible = false;
         this.runToken = 0;
         this.fallDistance = {};
         this.settleProgress = 1;
@@ -44,6 +54,14 @@ var Display = (function () {
         return this.onClickCell(cell.x, cell.y);
     };
     Display.prototype.onClickCell = function (x, y) {
+        if (this.helpVisible) {
+            this.hideHelp();
+            return {
+                "neighbors": {},
+                "x": -1,
+                "y": -1
+            };
+        }
         this.busy = true;
         var before = this.board.positions.slice();
         var neighbors = {};
@@ -121,34 +139,6 @@ var Display = (function () {
         c.fillStyle = "#ffeecc";
         c.lineJoin = "round";
     };
-    Display.prototype.middleCenterText = function (message) {
-        var c = this.context;
-        var lines = message.split("\n");
-        var big = Math.floor(0.75 * this.scoreHeight);
-        var small = Math.floor(0.42 * this.scoreHeight);
-        var lineHeight = Math.floor(this.scoreHeight * 0.95);
-        c.textAlign = "center";
-        this.setInk();
-        var y = (this.canvas.height / 2) - ((lineHeight * (lines.length - 1)) / 2);
-        for (var i = 0; i < lines.length; i++) {
-            if (lines[i].length > 0) {
-                c.font = "bold " + (i === 0 ? big : small) + "px Arial";
-                c.lineWidth = i === 0 ? 6 : 3.5;
-                c.strokeText(lines[i], this.half_width, y);
-                c.fillText(lines[i], this.half_width, y);
-            }
-            y += lineHeight;
-        }
-    };
-    Display.prototype.bottomCenterText = function (s) {
-        this.setFont();
-        var c = this.context;
-        c.textAlign = "center";
-        this.setInk();
-        var y = this.canvas.height - this.step;
-        c.strokeText(s, this.half_width, y);
-        c.fillText(s, this.half_width, y);
-    };
     Display.addCommas = function (s) {
         var o = "";
         for (var i = s.length - 1; i >= 0; i--) {
@@ -162,15 +152,112 @@ var Display = (function () {
     Display.prototype.showGameOver = function (message) {
         this.finished = true;
         this.floaters = [];
-        this.shadeBackGround();
-        this.middleCenterText(message);
-        this.bottomCenterText("Tap to Continue");
-        this.updateScore();
+        this.card = { message: message, started: Date.now() };
+        this.animateCard();
+    };
+    Display.prototype.playCardExit = function (done) {
+        var _this = this;
+        if (this.card === null) {
+            done();
+            return;
+        }
+        this.stopEffects();
+        var token = ++this.cardToken;
+        var started = Date.now();
+        var frame = function () {
+            if (token !== _this.cardToken) {
+                return;
+            }
+            var p = Math.min(1, (Date.now() - started) / 160);
+            _this.cardAlpha = 1 - p;
+            _this.draw();
+            if (p < 1) {
+                requestAnimationFrame(frame);
+                return;
+            }
+            _this.card = null;
+            _this.cardAlpha = 1;
+            done();
+        };
+        requestAnimationFrame(frame);
+    };
+    Display.prototype.animateCard = function () {
+        var _this = this;
+        this.stopEffects();
+        var frame = function () {
+            if (_this.card === null) {
+                return;
+            }
+            _this.draw();
+            if ((Date.now() - _this.card.started) < 4000) {
+                requestAnimationFrame(frame);
+            }
+        };
+        this.cardToken++;
+        requestAnimationFrame(frame);
+    };
+    Display.prototype.stopEffects = function () {
+        this.effectToken++;
+        this.effectRunning = false;
+    };
+    Display.prototype.drawCard = function () {
+        var c = this.context;
+        var age = Date.now() - this.card.started;
+        var lines = this.card.message.split("\n");
+        var lineHeight = Math.floor(this.scoreHeight * 0.95);
+        var top = (this.canvas.height / 2) - ((lineHeight * (lines.length - 1)) / 2);
+        var alpha = this.cardAlpha;
+        c.fillStyle = "#221100";
+        c.globalAlpha = 0.70 * Math.min(1, age / 220) * alpha;
+        c.fillRect(0, 0, this.width, this.height);
+        c.globalAlpha = 1;
+        c.textAlign = "center";
+        this.setInk();
+        for (var i = 0; i < lines.length; i++) {
+            var arrival = Math.min(1, (age - (i * 90)) / 260);
+            if (arrival <= 0) {
+                continue;
+            }
+            var eased = 1 - Math.pow(1 - arrival, 3);
+            var size = (i === 0) ? 0.75 : 0.42;
+            var pop = (i === 0) ? 1 + (0.06 * Math.sin(Math.PI * arrival)) : 1;
+            c.font = "bold " + Math.floor(this.scoreHeight * size * pop) + "px Arial";
+            c.lineWidth = (i === 0) ? 6 : 3.5;
+            c.globalAlpha = eased * alpha;
+            c.strokeText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * this.scoreHeight * 0.45));
+            c.fillText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * this.scoreHeight * 0.45));
+            c.globalAlpha = 1;
+        }
+        var promptAt = (lines.length * 90) + 320;
+        if (age <= promptAt) {
+            return;
+        }
+        var beat = age - promptAt;
+        var pulsing = beat < 3600;
+        var wave = 0.75 + (0.25 * (0.5 + (0.5 * Math.cos(beat / 190))));
+        c.font = "bold " + Math.floor(this.scoreHeight * 0.42) + "px Arial";
+        c.lineWidth = 3.5;
+        c.globalAlpha = (pulsing ? wave : 1) * alpha;
+        c.strokeText("Tap to Continue", this.half_width, this.canvas.height - this.step);
+        c.fillText("Tap to Continue", this.half_width, this.canvas.height - this.step);
+        c.globalAlpha = 1;
     };
     Display.prototype.updateScore = function () {
-        var s = this.game.score.toString();
-        var o = Display.addCommas(s);
-        this.topCenterText(o);
+        if (this.scoreSeen !== this.game.score) {
+            this.scoreFrom = this.scoreShown;
+            this.scoreChangedAt = Date.now();
+            this.scoreSeen = this.game.score;
+            this.tickEffects();
+        }
+        var age = (Date.now() - this.scoreChangedAt) / 250;
+        if (age >= 1) {
+            this.scoreShown = this.game.score;
+        }
+        else {
+            var eased = 1 - Math.pow(1 - age, 2);
+            this.scoreShown = Math.round(this.scoreFrom + ((this.game.score - this.scoreFrom) * eased));
+        }
+        this.topCenterText(Display.addCommas(this.scoreShown.toString()));
     };
     Display.prototype.drawTiles = function (rows) {
         if (rows === void 0) { rows = null; }
@@ -194,30 +281,73 @@ var Display = (function () {
             }
         }
     };
-    Display.prototype.topLeftText = function (s) {
-        this.setFont();
+    Display.prototype.turnsLeft = function () {
+        return this.game.movesAvailable - this.game.movesUsed;
+    };
+    Display.prototype.turnsInk = function () {
+        var left = this.turnsLeft();
+        if (left <= 2) {
+            return "#ff7a5c";
+        }
+        if (left <= 5) {
+            return "#f0b84a";
+        }
+        return "#ffeecc";
+    };
+    Display.prototype.pulseTurns = function () {
+        this.turnPulseAt = Date.now();
+        this.tickEffects();
+    };
+    Display.prototype.turnPulse = function () {
+        if (this.turnPulseAt === 0) {
+            return 1;
+        }
+        var age = (Date.now() - this.turnPulseAt) / 200;
+        if (age >= 1) {
+            return 1;
+        }
+        return 1 + (0.22 * Math.sin(Math.PI * age));
+    };
+    Display.prototype.drawTurnBar = function () {
         var c = this.context;
-        c.textAlign = "left";
-        this.setInk();
-        c.strokeText(s.toString(), this.horizontalOffset, this.font_pixels);
-        c.fillText(s.toString(), this.horizontalOffset, this.font_pixels);
+        var height = Math.max(2, Math.round(this.scoreHeight * 0.10));
+        var span = this.game.size * this.step;
+        var y = this.verticalOffset - height - 3;
+        c.fillStyle = "#33200d";
+        c.fillRect(this.horizontalOffset, y, span, height);
+        c.fillStyle = this.turnsInk();
+        c.fillRect(this.horizontalOffset, y, span * (this.turnsLeft() / this.game.movesAvailable), height);
     };
     Display.prototype.updateMovesAvailable = function () {
+        var left = this.turnsLeft();
+        var c = this.context;
         this.setFontSmall();
-        var m = this.game.movesAvailable - this.game.movesUsed;
-        this.topLeftText(m.toString() + " turns");
+        c.textAlign = "left";
+        c.strokeStyle = "#221100";
+        c.fillStyle = this.turnsInk();
+        c.lineJoin = "round";
+        var label = left + (left === 1 ? " turn" : " turns");
+        var x = this.horizontalOffset;
+        var y = this.font_pixels;
+        var scale = this.turnPulse();
+        if (scale === 1) {
+            c.strokeText(label, x, y);
+            c.fillText(label, x, y);
+        }
+        else {
+            c.save();
+            c.translate(x, y);
+            c.scale(scale, scale);
+            c.strokeText(label, 0, 0);
+            c.fillText(label, 0, 0);
+            c.restore();
+        }
+        this.drawTurnBar();
     };
     Display.prototype.clearBackGround = function () {
         var c = this.context;
         c.fillStyle = "#221100";
         c.fillRect(0, 0, this.width, this.height);
-    };
-    Display.prototype.shadeBackGround = function () {
-        var c = this.context;
-        c.fillStyle = "#221100";
-        c.globalAlpha = 0.70;
-        c.fillRect(0, 0, this.width, this.height);
-        c.globalAlpha = 1;
     };
     Display.prototype.draw = function (rows) {
         if (rows === void 0) { rows = null; }
@@ -233,6 +363,12 @@ var Display = (function () {
             this.drawMute();
         }
         this.drawFloaters();
+        if (this.card !== null) {
+            this.drawCard();
+        }
+        if (this.helpVisible) {
+            this.drawHelp();
+        }
     };
     Display.prototype.muteBox = function () {
         var size = this.scoreHeight;
@@ -269,6 +405,58 @@ var Display = (function () {
             c.strokeStyle = "#ffeecc";
             c.stroke();
         }
+        var help = this.helpBox();
+        var hx = help[0] + (size / 2);
+        c.strokeText("?", hx, cy);
+        c.fillText("?", hx, cy);
+    };
+    Display.prototype.helpBox = function () {
+        var size = this.scoreHeight;
+        return [this.width - (2 * size), 0, size, size];
+    };
+    Display.prototype.hitHelp = function (ex, ey) {
+        if (!this.showHud) {
+            return false;
+        }
+        var box = this.helpBox();
+        var x = ex * this.scale;
+        var y = ey * this.scale;
+        return x >= box[0] && x <= (box[0] + box[2]) && y >= box[1] && y <= (box[1] + box[3]);
+    };
+    Display.prototype.showHelp = function () {
+        this.helpVisible = true;
+        this.draw();
+    };
+    Display.prototype.hideHelp = function () {
+        this.helpVisible = false;
+        this.draw();
+    };
+    Display.prototype.drawHelp = function () {
+        var c = this.context;
+        var title = Math.floor(0.75 * this.scoreHeight);
+        var body = Math.floor(0.40 * this.scoreHeight);
+        var lineHeight = Math.floor(0.62 * this.scoreHeight);
+        c.fillStyle = "#221100";
+        c.globalAlpha = 0.90;
+        c.fillRect(0, 0, this.width, this.height);
+        c.globalAlpha = 1;
+        c.textAlign = "center";
+        this.setInk();
+        c.font = "bold " + title + "px Arial";
+        c.lineWidth = 5;
+        c.strokeText("How to play", this.half_width, this.width * 0.20);
+        c.fillText("How to play", this.half_width, this.width * 0.20);
+        c.font = "bold " + body + "px Arial";
+        c.lineWidth = 3.5;
+        var y = this.width * 0.34;
+        for (var i = 0; i < Display.rules.length; i++) {
+            c.strokeText(Display.rules[i], this.half_width, y);
+            c.fillText(Display.rules[i], this.half_width, y);
+            y += lineHeight;
+        }
+        c.font = "bold " + body + "px Arial";
+        c.strokeText("Tap anywhere to play", this.half_width, this.width * 0.93);
+        c.fillText("Tap anywhere to play", this.half_width, this.width * 0.93);
     };
     Display.prototype.focusCell = function (cell) {
         this.focused = cell;
@@ -441,18 +629,26 @@ var Display = (function () {
     };
     Display.prototype.tickEffects = function () {
         var _this = this;
+        if (this.effectRunning) {
+            return;
+        }
+        this.effectRunning = true;
         var token = ++this.effectToken;
         var frame = function () {
-            if (token !== _this.effectToken || _this.finished) {
+            if (token !== _this.effectToken) {
+                _this.effectRunning = false;
                 return;
             }
             if (_this.busy) {
+                _this.effectRunning = false;
                 return;
             }
             _this.draw();
-            if (_this.floaters.length > 0) {
+            if (_this.floaters.length > 0 || _this.turnPulse() !== 1 || _this.scoreShown !== _this.game.score) {
                 requestAnimationFrame(frame);
+                return;
             }
+            _this.effectRunning = false;
         };
         requestAnimationFrame(frame);
     };
@@ -485,6 +681,9 @@ var Display = (function () {
     };
     Display.prototype.stop = function () {
         this.runToken++;
+        this.stopEffects();
+        this.cardToken++;
+        this.card = null;
         this.busy = false;
     };
     Display.prototype.run = function (moves, onDone) {
@@ -609,6 +808,15 @@ var Display = (function () {
         Display.layer = layer;
         return layer;
     };
+    Display.rules = [
+        "Tap a letter to clear it",
+        "and the matching letters",
+        "joined to it.",
+        "A run of 2 scores 2,",
+        "4 scores 8, 8 scores 128.",
+        "Twenty turns, one per clear.",
+        "Your best stays on this device."
+    ];
     Display.layer = null;
     Display.layerTimer = 0;
     Display.styleId = "tc-animation";
