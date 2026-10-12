@@ -8,12 +8,13 @@ var Display = (function () {
         this.floaters = [];
         this.effectToken = 0;
         this.finished = false;
-        this.squashY = 1;
         this.focused = null;
         this.reduceMotion = false;
         this.showHud = true;
         this.muted = false;
         this.runToken = 0;
+        this.fallDistance = {};
+        this.settleProgress = 1;
         this.game = game;
         this.board = this.game.board;
         this.canvas = canvas;
@@ -188,7 +189,7 @@ var Display = (function () {
                 var t = new Tile(this.board.getPosition(x, y), this.board, this, row, hidden, x);
                 t.pressed = this.pressed !== null && this.pressed.x === x && this.pressed.y === y;
                 t.focused = this.focused !== null && this.focused.x === x && this.focused.y === y;
-                t.squashY = this.squashY;
+                t.squashY = this.squashFor(x, y);
                 t.draw();
             }
         }
@@ -318,8 +319,10 @@ var Display = (function () {
             return;
         }
         var moves = [];
+        this.fallDistance = {};
         for (var i = 0; i < plan.length; i++) {
             var m = plan[i];
+            this.fallDistance[m.x + "," + m.to] = Math.abs(m.to - m.from);
             moves.push({
                 x: m.x,
                 from: m.from,
@@ -330,6 +333,17 @@ var Display = (function () {
             });
         }
         this.run(moves, onDone);
+    };
+    Display.prototype.squashFor = function (x, y) {
+        if (this.settleProgress >= 1) {
+            return 1;
+        }
+        var distance = this.fallDistance[x + "," + y];
+        if (!distance) {
+            return 1;
+        }
+        var amplitude = Math.min(0.11, 0.035 + (0.018 * distance));
+        return 1 - (amplitude * Math.sin(Math.PI * this.settleProgress));
     };
     Display.prototype.animateSettle = function (onDone) {
         var _this = this;
@@ -349,13 +363,13 @@ var Display = (function () {
                 started = now;
             }
             var p = Math.min(1, (now - started) / duration);
-            _this.squashY = 1 - (0.12 * Math.sin(Math.PI * p));
+            _this.settleProgress = p;
             _this.draw();
             if (p < 1) {
                 requestAnimationFrame(frame);
                 return;
             }
-            _this.squashY = 1;
+            _this.settleProgress = 1;
             _this.draw();
             onDone();
         };

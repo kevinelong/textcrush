@@ -70,9 +70,6 @@ class Display {
     /** set once the game is over, so a fading floater cannot repaint over the end card */
     private finished: boolean = false;
 
-    /** vertical squash of the whole board for the landing, 1 = round */
-    private squashY: number = 1;
-
     /** the cell a keyboard or screen-reader user has focused, drawn with a ring */
     private focused: Neighbor = null;
 
@@ -365,7 +362,7 @@ class Display {
                 let t = new Tile(this.board.getPosition(x, y), this.board, this, row, hidden, x);
                 t.pressed = this.pressed !== null && this.pressed.x === x && this.pressed.y === y;
                 t.focused = this.focused !== null && this.focused.x === x && this.focused.y === y;
-                t.squashY = this.squashY;
+                t.squashY = this.squashFor(x, y);
                 t.draw();
             }
         }
@@ -558,8 +555,15 @@ class Display {
 
         let moves: Array<AnimationMove> = [];
 
+        // What the settle needs: which destination cells' tiles moved, and how far. Cells that did
+        // not move are absent, and that is what keeps the landing squash off them.
+        this.fallDistance = {};
+
         for (let i = 0; i < plan.length; i++) {
             let m = plan[i];
+
+            this.fallDistance[m.x + "," + m.to] = Math.abs(m.to - m.from);
+
             moves.push({
                 x: m.x,
                 from: m.from,
@@ -572,6 +576,37 @@ class Display {
         }
 
         this.run(moves, onDone);
+    }
+
+    /** how far each destination cell's tile fell in the last move, keyed "x,y" */
+    private fallDistance: RowOverrides = {};
+
+    /** 0..1 through the settle; 1 means nothing is squashing */
+    private settleProgress: number = 1;
+
+    /**
+     * How much this cell's tile is squashed right now.
+     *
+     * Only tiles that actually fell squash, and the amount follows the distance they fell: a single
+     * bubble coming out nudges the few tiles above it, a full column collapse thuds. Applying one
+     * squash to the whole board (which is what this did first) meant a one-bubble tap visibly
+     * bounced all 64 tiles.
+     */
+    private squashFor(x: number, y: number): number {
+
+        if (this.settleProgress >= 1) {
+            return 1;
+        }
+
+        let distance = this.fallDistance[x + "," + y];
+
+        if (!distance) {
+            return 1;
+        }
+
+        let amplitude = Math.min(0.11, 0.035 + (0.018 * distance));
+
+        return 1 - (amplitude * Math.sin(Math.PI * this.settleProgress));
     }
 
     /** the board taking the impact of the fall: a short squash anchored at each tile's bottom */
@@ -599,7 +634,7 @@ class Display {
 
             let p = Math.min(1, (now - started) / duration);
 
-            this.squashY = 1 - (0.12 * Math.sin(Math.PI * p));
+            this.settleProgress = p;
             this.draw();
 
             if (p < 1) {
@@ -607,7 +642,7 @@ class Display {
                 return;
             }
 
-            this.squashY = 1;
+            this.settleProgress = 1;
             this.draw();
             onDone();
         };
