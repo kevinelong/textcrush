@@ -163,10 +163,28 @@
 
         buildMirror();
 
+        // The in-progress game is kept here, so a restart resumes the board instead of dealing a new
+        // one. The high score has its own key and is never touched by this.
+        let SAVE_KEY = "game-state";
+
+        /** the board only changes when a move settles, so that is when it is worth writing */
+        function saveState() {
+
+            if (!g) {
+                return;
+            }
+
+            if (g.movesUsed >= g.movesAvailable) {
+                localStorage.removeItem(SAVE_KEY);
+                return;
+            }
+
+            localStorage.setItem(SAVE_KEY, g.serialize());
+        }
+
         // The wrapper's header draws score, turns and best itself, so the game hands it the state
         // rather than making it read the canvas.
         function report() {
-
             if (!g) {
                 return;
             }
@@ -214,7 +232,22 @@
 
             let previous = d;
 
-            g = new Game(8, 8);
+            // Resume the game that was in progress, if there is one. Anything unreadable - an older
+            // version's state, or a mangled value - is dropped and a fresh board dealt.
+            let saved = null;
+
+            try {
+                let stored = localStorage.getItem(SAVE_KEY);
+                saved = (stored === null) ? null : Game.restore(stored);
+            } catch (unreadable) {
+                saved = null;
+            }
+
+            if (saved === null) {
+                localStorage.removeItem(SAVE_KEY);
+            }
+
+            g = (saved === null) ? new Game(8, 8) : saved;
             d = new Display(c, g, !nativeHud);
 
             if (previous !== null) {
@@ -235,6 +268,9 @@
 
             function gameOver() {
                 let high_score_key = "high_score";
+
+                // The game is over: there is nothing to resume, and the next tap deals a new board.
+                localStorage.removeItem(SAVE_KEY);
 
                 c.removeEventListener('click', onClick);
                 c.removeEventListener('pointerdown', pressHandler);
@@ -346,6 +382,7 @@
                         d.animateSettle(function () {
 
                             updateMirror();
+                            saveState();
                             report();
 
                             if (g.movesUsed >= g.movesAvailable) {

@@ -194,6 +194,87 @@ class Game {
         return plan;
     }
 
+    /**
+     * The whole in-progress game as a string, small enough for localStorage.
+     *
+     * The eight characters in play matter as much as the board: colour is assigned by slot in
+     * getSymbols(), so putting the same characters back in the same slots puts the same colours back.
+     */
+    public serialize(): string {
+
+        let cells = "";
+
+        for (let y = 0; y < this.size; y++) {
+            for (let x = 0; x < this.size; x++) {
+
+                let symbol = this.board.positions[(y * this.size) + x];
+
+                if (symbol.value < 0) {
+                    cells += ".";
+                    continue;
+                }
+
+                // The slot index, not Symbol.value: the eight in play keep whatever index they had in
+                // the 82-symbol pool, so their values are arbitrary (and can need two base-36 digits).
+                let slot = this.symbols.indexOf(symbol);
+
+                cells += (slot < 0 || slot >= this.variations) ? "." : slot.toString(36);
+            }
+        }
+
+        let symbols = "";
+
+        for (let i = 0; i < this.variations; i++) {
+            symbols += this.symbols[i].character;
+        }
+
+        return JSON.stringify({
+            version: 1,
+            size: this.size,
+            variations: this.variations,
+            score: this.score,
+            used: this.movesUsed,
+            symbols: symbols,
+            cells: cells
+        });
+    }
+
+    /** rebuilds a game from serialize(); throws on anything it cannot read, so callers can start over */
+    public static restore(state: string): Game {
+
+        let data = JSON.parse(state);
+
+        if (data.version !== 1 || data.symbols.length !== data.variations
+            || data.cells.length !== data.size * data.size) {
+            throw new Error("unreadable saved game");
+        }
+
+        let game = new Game(data.size, data.variations);
+
+        // The saved characters go back into the first slots - the objects keep the colours getSymbols()
+        // gave their slot, which is what makes a restored board look like the board that was saved.
+        for (let i = 0; i < data.symbols.length; i++) {
+            game.symbols[i].character = data.symbols.charAt(i);
+            game.symbols[i].value = i;
+        }
+
+        for (let y = 0; y < data.size; y++) {
+            for (let x = 0; x < data.size; x++) {
+
+                let code = data.cells.charAt((y * data.size) + x);
+
+                game.board.setPosition(x, y, (code === ".")
+                    ? game.blank
+                    : game.symbols[parseInt(code, 36)]);
+            }
+        }
+
+        game.score = data.score;
+        game.movesUsed = data.used;
+
+        return game;
+    }
+
     public onRemove(x: number, y: number, neighbors: any) {
         //console.log("onRemove", x, y);
         let count = Object.keys(neighbors).length;

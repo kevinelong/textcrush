@@ -103,6 +103,56 @@ var Game = (function () {
         }
         return plan;
     };
+    Game.prototype.serialize = function () {
+        var cells = "";
+        for (var y = 0; y < this.size; y++) {
+            for (var x = 0; x < this.size; x++) {
+                var symbol = this.board.positions[(y * this.size) + x];
+                if (symbol.value < 0) {
+                    cells += ".";
+                    continue;
+                }
+                var slot = this.symbols.indexOf(symbol);
+                cells += (slot < 0 || slot >= this.variations) ? "." : slot.toString(36);
+            }
+        }
+        var symbols = "";
+        for (var i = 0; i < this.variations; i++) {
+            symbols += this.symbols[i].character;
+        }
+        return JSON.stringify({
+            version: 1,
+            size: this.size,
+            variations: this.variations,
+            score: this.score,
+            used: this.movesUsed,
+            symbols: symbols,
+            cells: cells
+        });
+    };
+    Game.restore = function (state) {
+        var data = JSON.parse(state);
+        if (data.version !== 1 || data.symbols.length !== data.variations
+            || data.cells.length !== data.size * data.size) {
+            throw new Error("unreadable saved game");
+        }
+        var game = new Game(data.size, data.variations);
+        for (var i = 0; i < data.symbols.length; i++) {
+            game.symbols[i].character = data.symbols.charAt(i);
+            game.symbols[i].value = i;
+        }
+        for (var y = 0; y < data.size; y++) {
+            for (var x = 0; x < data.size; x++) {
+                var code = data.cells.charAt((y * data.size) + x);
+                game.board.setPosition(x, y, (code === ".")
+                    ? game.blank
+                    : game.symbols[parseInt(code, 36)]);
+            }
+        }
+        game.score = data.score;
+        game.movesUsed = data.used;
+        return game;
+    };
     Game.prototype.onRemove = function (x, y, neighbors) {
         var count = Object.keys(neighbors).length;
         var b = this.board;
