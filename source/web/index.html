@@ -24,13 +24,21 @@
         document.body.style.margin = "0";
         document.body.appendChild(c);
 
+        let g = null;
+        let d = null;
+
         function initialize() {
 
             c.removeEventListener('click', initialize);
 
-            let g = new Game(8, 8);
-            let d = new Display(c, g);
+            let previous = d;
 
+            g = new Game(8, 8);
+            d = new Display(c, g);
+
+            if (previous !== null) {
+                previous.stop();
+            }
 
             function gameOver() {
                 let high_score_key = "high_score";
@@ -51,6 +59,7 @@
 
 
                 d.showGameOver(message);
+                d.burst();
 
                 g = null;
                 d = null;
@@ -77,13 +86,15 @@
 
             function onClick(e) {
 
+                if (d.busy) {
+                    return;
+                }
+
                 let delay = 150;
 
                 let values = d.onClick(e.x, e.y);
 
                 let neighbors = values["neighbors"];
-
-                d.draw();
 
                 if (AudioContext) {
 
@@ -107,28 +118,25 @@
 
                 setTimeout(function () {
 
-                    d.draw();
+                    let plan = g.fallPlan();
 
-                    setTimeout(function () {
+                    g.moveDown();
 
-                        g.moveDown();
-                        d.draw();
+                    d.animateFall(plan, function () {
 
-                        setTimeout(function () {
+                        if (g.movesUsed >= g.movesAvailable) {
+                            gameOver();
+                        }
 
-                            if (g.movesUsed >= g.movesAvailable) {
-                                gameOver();
-                            }
+                    });
 
-                        }, delay / 2);
-                    }, delay);
                 }, delay);
 
             }
 
-            c.addEventListener('click', onClick);
-
-            d.draw();
+            d.animateReveal(function () {
+                c.addEventListener('click', onClick);
+            });
         }
 
         initialize();
@@ -141,8 +149,9 @@
                 if (!resizeTimeout) {
                     resizeTimeout = setTimeout(function () {
                         resizeTimeout = null;
-                        debugger;
-                        d.draw();
+                        if (d !== null) {
+                            d.draw();
+                        }
                     }, 66);
                 }
             }

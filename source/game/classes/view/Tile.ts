@@ -5,48 +5,26 @@ class Tile {
     display: Display;
     cx: number;
     cy: number;
+    hidden: boolean;
 
-    constructor(position: Symbol, board: Board, display: Display) {
+    constructor(
+        position: Symbol,
+        board: Board,
+        display: Display,
+        row: number = null,
+        hidden: boolean = false
+    ) {
 
         this.position = position;
         this.board = board;
         this.display = display;
-
-        this.cx = (this.position.x * this.display.step) + this.display.horizontalOffset;
-        this.cy = (this.position.y * this.display.step) + this.display.verticalOffset;
-        ////console.log(this.cx,this.cy);
-    }
-
-    //
-    // public getSymbol(){
-    //     return this.symbol;
-    // }
-
-    private clear() {
-
-        let c = this.display.context;
+        this.hidden = hidden;
 
         let step = this.display.step;
-        let padding = this.display.padding;
+        let r = (row === null) ? this.position.y : row;
 
-        c.beginPath();
-
-        c.arc(
-            this.cx + (step - padding) / 2,
-            this.cy + (step - padding) / 2,
-            step / 2 - padding,
-            0,
-            2 * Math.PI,
-            false
-        );
-
-
-        c.fillStyle = "rgb(128,128,128)";
-        c.strokeStyle = "rgb(128,128,128)";
-
-        c.fill();
-
-        c.globalAlpha = 1;
+        this.cx = (this.position.x * step) + this.display.horizontalOffset;
+        this.cy = (r * step) + this.display.verticalOffset;
     }
 
     private circle() {
@@ -159,13 +137,13 @@ class Tile {
 
     public draw() {
 
-        if (-1 === this.position.value) {
-            this.clear();
-        } else {
-            this.circle();
-            this.highlight();
-            this.shadow();
-            this.text();
+        if (this.hidden || -1 === this.position.value) {
+            return;
         }
+
+        this.circle();
+        this.highlight();
+        this.shadow();
+        this.text();
     }
 }

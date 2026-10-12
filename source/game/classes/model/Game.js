@@ -92,6 +92,31 @@ var Game = (function () {
             this.moveDown();
         }
     };
+    Game.prototype.fallPlan = function () {
+        var plan = [];
+        var size = this.size;
+        var b = this.board;
+        for (var x = 0; x < size; x++) {
+            var rows = [];
+            for (var y = size - 1; y >= 0; y--) {
+                if (b.getPosition(x, y).value != -1) {
+                    rows.push(y);
+                }
+            }
+            var blanks = size - rows.length;
+            for (var i = 0; i < rows.length; i++) {
+                plan.push({
+                    x: x, from: rows[i], to: size - 1 - i, spawned: false
+                });
+            }
+            for (var i = 0; i < blanks; i++) {
+                plan.push({
+                    x: x, from: i - blanks, to: i, spawned: true
+                });
+            }
+        }
+        return plan;
+    };
     Game.prototype.onRemove = function (x, y, neighbors) {
         var count = Object.keys(neighbors).length;
         var b = this.board;

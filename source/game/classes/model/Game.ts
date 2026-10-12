@@ -1,3 +1,17 @@
+interface FallMove {
+
+    x: number;
+
+    /** row the tile occupies now, negative when it starts above the grid */
+    from: number;
+
+    /** row the tile occupies once the board has settled */
+    to: number;
+
+    /** true when the tile is one of the refills injected at the top */
+    spawned: boolean;
+}
+
 class Game {
 
     score: number;
@@ -136,6 +150,48 @@ class Game {
             this.moveDown();
         }
 
+    }
+
+    /**
+     * Describes what moveDown() is about to do, cell by cell, without touching the board.
+     *
+     * Each column settles independently: its tiles keep their bottom-up order and pack
+     * against the bottom, and the freed rows above are refilled. So the tile that is
+     * i-th from the bottom of a column lands on row size-1-i, and the refills enter as a
+     * stack falling in from above the grid. Every cell of the board appears exactly once.
+     */
+    public fallPlan(): Array<FallMove> {
+
+        let plan: Array<FallMove> = [];
+        let size = this.size;
+        let b = this.board;
+
+        for (let x = 0; x < size; x++) {
+
+            let rows: Array<number> = [];
+
+            for (let y = size - 1; y >= 0; y--) {
+                if (b.getPosition(x, y).value != -1) {
+                    rows.push(y);
+                }
+            }
+
+            let blanks = size - rows.length;
+
+            for (let i = 0; i < rows.length; i++) {
+                plan.push({
+                    x: x, from: rows[i], to: size - 1 - i, spawned: false
+                });
+            }
+
+            for (let i = 0; i < blanks; i++) {
+                plan.push({
+                    x: x, from: i - blanks, to: i, spawned: true
+                });
+            }
+        }
+
+        return plan;
     }
 
     public onRemove(x: number, y: number, neighbors: any) {
