@@ -414,7 +414,8 @@ class Display {
         let c = this.context;
         let age = Date.now() - this.card.started;
         let lines = this.card.message.split("\n");
-        let lineHeight = Math.floor(this.scoreHeight * 0.95);
+        let unit = this.textUnit();
+        let lineHeight = Math.floor(unit * 0.95);
         let top = (this.canvas.height / 2) - ((lineHeight * (lines.length - 1)) / 2);
         let alpha = this.cardAlpha;
 
@@ -439,12 +440,12 @@ class Display {
             // the title comes in with a little overshoot and settles
             let pop = (i === 0) ? 1 + (0.06 * Math.sin(Math.PI * arrival)) : 1;
 
-            c.font = "bold " + Math.floor(this.scoreHeight * size * pop) + "px Arial";
+            c.font = "bold " + Math.floor(unit * size * pop) + "px Arial";
             c.lineWidth = (i === 0) ? 6 : 3.5;
             c.globalAlpha = eased * alpha;
 
-            c.strokeText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * this.scoreHeight * 0.45));
-            c.fillText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * this.scoreHeight * 0.45));
+            c.strokeText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * unit * 0.45));
+            c.fillText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * unit * 0.45));
 
             c.globalAlpha = 1;
         }
@@ -459,7 +460,7 @@ class Display {
         let pulsing = beat < 3600;
         let wave = 0.75 + (0.25 * (0.5 + (0.5 * Math.cos(beat / 190))));
 
-        c.font = "bold " + Math.floor(this.scoreHeight * 0.42) + "px Arial";
+        c.font = "bold " + Math.floor(unit * 0.42) + "px Arial";
         c.lineWidth = 3.5;
         c.globalAlpha = (pulsing ? wave : 1) * alpha;
 
@@ -744,6 +745,22 @@ class Display {
     }
 
     /**
+     * The unit board-area text is sized in.
+     *
+     * The game's own score line is the yardstick while it owns one, and the wrappers take it away
+     * (hud=off) so their own header can draw the numbers as real text. Everything the game still
+     * draws over the board - the rules, the end card, the score pops - was being sized from that 0,
+     * so `bold 0px Arial` drew nothing and the rules screen came up as a dimmed board with no words
+     * on it. The fallback is the same share of the square the score line would have taken.
+     */
+    private textUnit(): number {
+
+        return this.scoreHeight > 0
+            ? this.scoreHeight
+            : Math.floor(this.minimum / (this.board.size + 1));
+    }
+
+    /**
      * The rules, over a dimmed board.
      *
      * The game is one screen with no words on it until this, so the rules are shown once on a fresh
@@ -752,9 +769,10 @@ class Display {
     private drawHelp() {
 
         let c = this.context;
-        let title = Math.floor(0.75 * this.scoreHeight);
-        let body = Math.floor(0.40 * this.scoreHeight);
-        let lineHeight = Math.floor(0.62 * this.scoreHeight);
+        let unit = this.textUnit();
+        let title = Math.floor(0.75 * unit);
+        let body = Math.floor(0.40 * unit);
+        let lineHeight = Math.floor(0.62 * unit);
 
         c.fillStyle = "#221100";
         c.globalAlpha = 0.90;
@@ -1110,7 +1128,7 @@ class Display {
         let live: Array<Floater> = [];
 
         c.textAlign = "center";
-        c.font = "bold " + Math.floor(this.scoreHeight * 0.5) + "px Arial";
+        c.font = "bold " + Math.floor(this.textUnit() * 0.5) + "px Arial";
         c.lineWidth = 4;
         c.strokeStyle = "#221100";
         c.fillStyle = "#ffeecc";

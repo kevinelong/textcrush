@@ -204,7 +204,8 @@ var Display = (function () {
         var c = this.context;
         var age = Date.now() - this.card.started;
         var lines = this.card.message.split("\n");
-        var lineHeight = Math.floor(this.scoreHeight * 0.95);
+        var unit = this.textUnit();
+        var lineHeight = Math.floor(unit * 0.95);
         var top = (this.canvas.height / 2) - ((lineHeight * (lines.length - 1)) / 2);
         var alpha = this.cardAlpha;
         c.fillStyle = "#221100";
@@ -221,11 +222,11 @@ var Display = (function () {
             var eased = 1 - Math.pow(1 - arrival, 3);
             var size = (i === 0) ? 0.75 : 0.42;
             var pop = (i === 0) ? 1 + (0.06 * Math.sin(Math.PI * arrival)) : 1;
-            c.font = "bold " + Math.floor(this.scoreHeight * size * pop) + "px Arial";
+            c.font = "bold " + Math.floor(unit * size * pop) + "px Arial";
             c.lineWidth = (i === 0) ? 6 : 3.5;
             c.globalAlpha = eased * alpha;
-            c.strokeText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * this.scoreHeight * 0.45));
-            c.fillText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * this.scoreHeight * 0.45));
+            c.strokeText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * unit * 0.45));
+            c.fillText(lines[i], this.half_width, top + (i * lineHeight) + ((1 - eased) * unit * 0.45));
             c.globalAlpha = 1;
         }
         var promptAt = (lines.length * 90) + 320;
@@ -235,7 +236,7 @@ var Display = (function () {
         var beat = age - promptAt;
         var pulsing = beat < 3600;
         var wave = 0.75 + (0.25 * (0.5 + (0.5 * Math.cos(beat / 190))));
-        c.font = "bold " + Math.floor(this.scoreHeight * 0.42) + "px Arial";
+        c.font = "bold " + Math.floor(unit * 0.42) + "px Arial";
         c.lineWidth = 3.5;
         c.globalAlpha = (pulsing ? wave : 1) * alpha;
         c.strokeText("Tap to Continue", this.half_width, this.canvas.height - this.step);
@@ -431,11 +432,17 @@ var Display = (function () {
         this.helpVisible = false;
         this.draw();
     };
+    Display.prototype.textUnit = function () {
+        return this.scoreHeight > 0
+            ? this.scoreHeight
+            : Math.floor(this.minimum / (this.board.size + 1));
+    };
     Display.prototype.drawHelp = function () {
         var c = this.context;
-        var title = Math.floor(0.75 * this.scoreHeight);
-        var body = Math.floor(0.40 * this.scoreHeight);
-        var lineHeight = Math.floor(0.62 * this.scoreHeight);
+        var unit = this.textUnit();
+        var title = Math.floor(0.75 * unit);
+        var body = Math.floor(0.40 * unit);
+        var lineHeight = Math.floor(0.62 * unit);
         c.fillStyle = "#221100";
         c.globalAlpha = 0.90;
         c.fillRect(0, 0, this.width, this.height);
@@ -660,7 +667,7 @@ var Display = (function () {
         var now = Date.now();
         var live = [];
         c.textAlign = "center";
-        c.font = "bold " + Math.floor(this.scoreHeight * 0.5) + "px Arial";
+        c.font = "bold " + Math.floor(this.textUnit() * 0.5) + "px Arial";
         c.lineWidth = 4;
         c.strokeStyle = "#221100";
         c.fillStyle = "#ffeecc";

@@ -520,7 +520,10 @@
         // Offline shell: after the first visit the game runs from the cache, which is what makes it
         // installable (Add to Home Screen) and playable on a plane. The worker lives one directory up
         // because its scope has to cover the engine in ../game/ as well as this page.
-        if ("serviceWorker" in navigator && "file:" !== location.protocol) {
+        //
+        // Not in a wrapper: the assets are already local there, the worker is not bundled, and asking
+        // for it only produces a failed fetch in the console.
+        if ("serviceWorker" in navigator && "file:" !== location.protocol && !nativeHud) {
             navigator.serviceWorker.register("../sw.js");
         }
     })
