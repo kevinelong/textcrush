@@ -2,6 +2,11 @@ var Display = (function () {
     function Display(canvas, game) {
         this.scale = 1;
         this.busy = false;
+        this.pressed = null;
+        this.removed = [];
+        this.floaters = [];
+        this.effectToken = 0;
+        this.finished = false;
         this.runToken = 0;
         this.game = game;
         this.board = this.game.board;
@@ -20,24 +25,68 @@ var Display = (function () {
         this.hideBurst();
     }
     Display.prototype.onClick = function (ex, ey) {
-        var x = Math.floor((ex * this.scale - this.horizontalOffset) / this.step);
-        var y = Math.floor((ey * this.scale - this.verticalOffset) / this.step);
-        if (x < 0 || y < 0 || x >= this.game.size || y >= this.game.size) {
+        var cell = this.cellAt(ex, ey);
+        if (cell === null) {
             return {
                 "neighbors": {},
-                "x": x,
-                "y": y
+                "x": -1,
+                "y": -1
             };
         }
         this.busy = true;
+        var before = this.board.positions.slice();
         var neighbors = {};
-        this.game.onRemove(x, y, neighbors);
+        this.game.onRemove(cell.x, cell.y, neighbors);
+        this.removed = this.captureRemoved(before);
         this.draw();
         return {
             "neighbors": neighbors,
-            "x": x,
-            "y": y
+            "x": cell.x,
+            "y": cell.y
         };
+    };
+    Display.prototype.cellAt = function (ex, ey) {
+        var x = Math.floor((ex * this.scale - this.horizontalOffset) / this.step);
+        var y = Math.floor((ey * this.scale - this.verticalOffset) / this.step);
+        if (x < 0 || y < 0 || x >= this.game.size || y >= this.game.size) {
+            return null;
+        }
+        return new Neighbor(x, y);
+    };
+    Display.prototype.captureRemoved = function (before) {
+        var out = [];
+        var size = this.board.size;
+        for (var y = 0; y < size; y++) {
+            for (var x = 0; x < size; x++) {
+                var index = (y * size) + x;
+                if (before[index].value != -1 && this.board.positions[index].value == -1) {
+                    out.push({ x: x, y: y, symbol: before[index] });
+                }
+            }
+        }
+        return out;
+    };
+    Display.prototype.press = function (ex, ey) {
+        if (this.busy) {
+            return;
+        }
+        var cell = this.cellAt(ex, ey);
+        if (cell === null) {
+            this.releasePress();
+            return;
+        }
+        if (this.pressed !== null && this.pressed.x === cell.x && this.pressed.y === cell.y) {
+            return;
+        }
+        this.pressed = cell;
+        this.draw();
+    };
+    Display.prototype.releasePress = function () {
+        if (this.pressed === null) {
+            return;
+        }
+        this.pressed = null;
+        this.draw();
     };
     Display.prototype.setFont = function () {
         this.font_pixels = Math.floor(0.75 * this.scoreHeight);
@@ -51,29 +100,40 @@ var Display = (function () {
         this.setFont();
         var c = this.context;
         c.textAlign = "center";
-        c.lineWidth = 3.5;
-        c.strokeStyle = "#ffeecc";
-        c.fillStyle = "#333333";
+        this.setInk();
         c.strokeText(s, this.half_width, this.font_pixels);
         c.fillText(s, this.half_width, this.font_pixels);
     };
-    Display.prototype.middleCenterText = function (s) {
+    Display.prototype.setInk = function () {
         var c = this.context;
+        c.strokeStyle = "#221100";
+        c.fillStyle = "#ffeecc";
+        c.lineJoin = "round";
+    };
+    Display.prototype.middleCenterText = function (message) {
+        var c = this.context;
+        var lines = message.split("\n");
+        var big = Math.floor(0.75 * this.scoreHeight);
+        var small = Math.floor(0.42 * this.scoreHeight);
+        var lineHeight = Math.floor(this.scoreHeight * 0.95);
         c.textAlign = "center";
-        c.lineWidth = 3.5;
-        c.strokeStyle = "#ffeecc";
-        c.fillStyle = "#333333";
-        var y = this.canvas.height / 2 - this.font_pixels / 2;
-        c.strokeText(s, this.half_width, y);
-        c.fillText(s, this.half_width, y);
+        this.setInk();
+        var y = (this.canvas.height / 2) - ((lineHeight * (lines.length - 1)) / 2);
+        for (var i = 0; i < lines.length; i++) {
+            if (lines[i].length > 0) {
+                c.font = "bold " + (i === 0 ? big : small) + "px Arial";
+                c.lineWidth = i === 0 ? 6 : 3.5;
+                c.strokeText(lines[i], this.half_width, y);
+                c.fillText(lines[i], this.half_width, y);
+            }
+            y += lineHeight;
+        }
     };
     Display.prototype.bottomCenterText = function (s) {
         this.setFont();
         var c = this.context;
         c.textAlign = "center";
-        c.lineWidth = 3.5;
-        c.strokeStyle = "#ffeecc";
-        c.fillStyle = "#333333";
+        this.setInk();
         var y = this.canvas.height - this.step;
         c.strokeText(s, this.half_width, y);
         c.fillText(s, this.half_width, y);
@@ -89,6 +149,8 @@ var Display = (function () {
         return o;
     };
     Display.prototype.showGameOver = function (message) {
+        this.finished = true;
+        this.floaters = [];
         this.shadeBackGround();
         this.middleCenterText(message);
         this.bottomCenterText("Tap to Continue");
@@ -113,7 +175,8 @@ var Display = (function () {
                     row = rows[key];
                     hidden = (row === null);
                 }
-                var t = new Tile(this.board.getPosition(x, y), this.board, this, row, hidden);
+                var t = new Tile(this.board.getPosition(x, y), this.board, this, row, hidden, x);
+                t.pressed = this.pressed !== null && this.pressed.x === x && this.pressed.y === y;
                 t.draw();
             }
         }
@@ -122,6 +185,7 @@ var Display = (function () {
         this.setFont();
         var c = this.context;
         c.textAlign = "left";
+        this.setInk();
         c.strokeText(s.toString(), this.horizontalOffset, this.font_pixels);
         c.fillText(s.toString(), this.horizontalOffset, this.font_pixels);
     };
@@ -147,9 +211,22 @@ var Display = (function () {
         this.half_width = this.horizontalOffset + (this.game.size * this.step / 2);
         this.setFont();
         this.clearBackGround();
+        this.boardClip();
         this.drawTiles(rows);
+        this.unclip();
         this.updateScore();
         this.updateMovesAvailable();
+        this.drawFloaters();
+    };
+    Display.prototype.boardClip = function () {
+        var c = this.context;
+        c.save();
+        c.beginPath();
+        c.rect(this.horizontalOffset, this.verticalOffset, this.game.size * this.step, this.game.size * this.step);
+        c.clip();
+    };
+    Display.prototype.unclip = function () {
+        this.context.restore();
     };
     Display.prototype.animateReveal = function (onDone) {
         var moves = [];
@@ -188,6 +265,109 @@ var Display = (function () {
             });
         }
         this.run(moves, onDone);
+    };
+    Display.prototype.animatePop = function (onDone) {
+        var _this = this;
+        var tiles = this.removed;
+        this.removed = [];
+        if (tiles.length === 0) {
+            onDone();
+            return;
+        }
+        var token = ++this.runToken;
+        var started = -1;
+        var duration = 110;
+        var frame = function (now) {
+            if (token !== _this.runToken) {
+                return;
+            }
+            if (started < 0) {
+                started = now;
+            }
+            var p = Math.min(1, (now - started) / duration);
+            _this.draw();
+            for (var i = 0; i < tiles.length; i++) {
+                var t = tiles[i];
+                var tile = new Tile(t.symbol, _this.board, _this, t.y, false, t.x);
+                tile.scale = Math.max(0, 1 + (0.18 * Math.sin(Math.PI * p)) - (p * p));
+                tile.alpha = 1 - p;
+                tile.draw();
+            }
+            if (p < 1) {
+                requestAnimationFrame(frame);
+                return;
+            }
+            _this.draw();
+            onDone();
+        };
+        requestAnimationFrame(frame);
+    };
+    Display.prototype.scoreFloat = function (neighbors, gained) {
+        var keys = Object.keys(neighbors);
+        if (keys.length === 0 || gained <= 0) {
+            return;
+        }
+        var sx = 0;
+        var sy = 0;
+        for (var i = 0; i < keys.length; i++) {
+            var parts = keys[i].split(",");
+            sx += parseInt(parts[0], 10);
+            sy += parseInt(parts[1], 10);
+        }
+        var cx = this.horizontalOffset + ((sx / keys.length) + 0.5) * this.step;
+        var cy = this.verticalOffset + ((sy / keys.length) + 0.5) * this.step;
+        this.float("+" + Display.addCommas(gained.toString()), cx, cy);
+    };
+    Display.prototype.float = function (text, cx, cy) {
+        if (this.finished) {
+            return;
+        }
+        this.floaters.push({ text: text, x: cx, y: cy, born: Date.now() });
+        this.tickEffects();
+    };
+    Display.prototype.tickEffects = function () {
+        var _this = this;
+        var token = ++this.effectToken;
+        var frame = function () {
+            if (token !== _this.effectToken || _this.finished) {
+                return;
+            }
+            if (_this.busy) {
+                return;
+            }
+            _this.draw();
+            if (_this.floaters.length > 0) {
+                requestAnimationFrame(frame);
+            }
+        };
+        requestAnimationFrame(frame);
+    };
+    Display.prototype.drawFloaters = function () {
+        if (this.floaters.length === 0) {
+            return;
+        }
+        var c = this.context;
+        var now = Date.now();
+        var live = [];
+        c.textAlign = "center";
+        c.font = "bold " + Math.floor(this.scoreHeight * 0.5) + "px Arial";
+        c.lineWidth = 4;
+        c.strokeStyle = "#221100";
+        c.fillStyle = "#ffeecc";
+        for (var i = 0; i < this.floaters.length; i++) {
+            var f = this.floaters[i];
+            var age = (now - f.born) / 600;
+            if (age >= 1) {
+                continue;
+            }
+            live.push(f);
+            var y = f.y - (age * this.step);
+            c.globalAlpha = 1 - age;
+            c.strokeText(f.text, f.x, y);
+            c.fillText(f.text, f.x, y);
+            c.globalAlpha = 1;
+        }
+        this.floaters = live;
     };
     Display.prototype.stop = function () {
         this.runToken++;
@@ -245,6 +425,7 @@ var Display = (function () {
             _this.draw();
             _this.busy = false;
             onDone();
+            _this.tickEffects();
         };
         requestAnimationFrame(frame);
     };

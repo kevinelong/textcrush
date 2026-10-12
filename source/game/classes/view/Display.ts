@@ -15,6 +15,26 @@ interface RowOverrides {
     [key: string]: number;
 }
 
+/** the neighbours map the model fills in, keyed "x,y" */
+interface NeighborKeys {
+    [key: string]: string;
+}
+
+/** a cell of the run that was just cleared, kept so the view can show it leaving */
+interface RemovedTile {
+    x: number;
+    y: number;
+    symbol: Symbol;
+}
+
+/** a "+16" that rises from where the run was scored and fades */
+interface Floater {
+    text: string;
+    x: number;
+    y: number;
+    born: number;
+}
+
 class Display {
 
     board: Board;
@@ -37,6 +57,18 @@ class Display {
 
     /** true while tiles are moving; input is ignored until the board is still */
     busy: boolean = false;
+
+    /** the cell a finger is down on, so it can look pressed before the tap lands */
+    private pressed: Neighbor = null;
+
+    /** the run the last tap cleared, waiting to be drawn shrinking away */
+    private removed: Array<RemovedTile> = [];
+
+    private floaters: Array<Floater> = [];
+    private effectToken: number = 0;
+
+    /** set once the game is over, so a fading floater cannot repaint over the end card */
+    private finished: boolean = false;
 
     private overlay: HTMLDivElement;
     private runToken: number = 0;
@@ -75,32 +107,102 @@ class Display {
 
     onClick(ex: number, ey: number) {
 
-        let x = Math.floor((ex * this.scale - this.horizontalOffset) / this.step);
-        let y = Math.floor((ey * this.scale - this.verticalOffset) / this.step);
+        let cell: Neighbor = this.cellAt(ex, ey);
 
-        if (x < 0 || y < 0 || x >= this.game.size || y >= this.game.size) {
+        if (cell === null) {
             // The square the game draws in is 9 rows tall: the score line sits in the top one, and a
             // tap on the last pixel row lands just past the board. Those taps index nothing, so
             // ignore them - and in particular do not latch busy, which would freeze the board for
             // good, since every later tap is dropped while busy is set.
             return {
                 "neighbors": {},
-                "x": x,
-                "y": y
+                "x": -1,
+                "y": -1
             };
         }
 
         this.busy = true;
 
-        let neighbors = {};
-        this.game.onRemove(x, y, neighbors);
+        // The run is remembered before it goes, because afterwards the board no longer has it and
+        // the view wants to show it leaving rather than blinking out.
+        let before = this.board.positions.slice();
+
+        let neighbors: NeighborKeys = {};
+        this.game.onRemove(cell.x, cell.y, neighbors);
+        this.removed = this.captureRemoved(before);
+
         this.draw();
 
         return {
             "neighbors": neighbors,
-            "x": x,
-            "y": y
+            "x": cell.x,
+            "y": cell.y
         };
+    }
+
+    /** the cell a css-space point lands on, or null when the point is not on the board */
+    private cellAt(ex: number, ey: number): Neighbor {
+
+        let x = Math.floor((ex * this.scale - this.horizontalOffset) / this.step);
+        let y = Math.floor((ey * this.scale - this.verticalOffset) / this.step);
+
+        if (x < 0 || y < 0 || x >= this.game.size || y >= this.game.size) {
+            return null;
+        }
+
+        return new Neighbor(x, y);
+    }
+
+    /** what the cleared run looked like, so it can be drawn shrinking away */
+    private captureRemoved(before: Array<Symbol>): Array<RemovedTile> {
+
+        let out: Array<RemovedTile> = [];
+        let size = this.board.size;
+
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+
+                let index = (y * size) + x;
+
+                if (before[index].value != -1 && this.board.positions[index].value == -1) {
+                    out.push({ x: x, y: y, symbol: before[index] });
+                }
+            }
+        }
+
+        return out;
+    }
+
+    /** a finger went down on a cell: show it pressed until it lifts */
+    press(ex: number, ey: number) {
+
+        if (this.busy) {
+            return;
+        }
+
+        let cell = this.cellAt(ex, ey);
+
+        if (cell === null) {
+            this.releasePress();
+            return;
+        }
+
+        if (this.pressed !== null && this.pressed.x === cell.x && this.pressed.y === cell.y) {
+            return;
+        }
+
+        this.pressed = cell;
+        this.draw();
+    }
+
+    releasePress() {
+
+        if (this.pressed === null) {
+            return;
+        }
+
+        this.pressed = null;
+        this.draw();
     }
 
     setFont() {
@@ -117,26 +219,57 @@ class Display {
         this.setFont();
         let c = this.context;
         c.textAlign = "center";
-        c.lineWidth = 3.5;
-        c.strokeStyle = "#ffeecc";
-        c.fillStyle = "#333333";
+        this.setInk();
 
         c.strokeText(s, this.half_width, this.font_pixels);
         c.fillText(s, this.half_width, this.font_pixels);
     }
 
-    middleCenterText(s: string) {
+    /**
+     * Cream lettering outlined in the board's own colour.
+     *
+     * The HUD used to be drawn as #333333 with a #ffeecc outline, which measures 1.45:1 for the fill
+     * against the board ground - the glyph interiors were effectively invisible and only the outline
+     * carried the shape. This way round the fill is the legible part (15.98:1) and the outline just
+     * separates it from the background.
+     */
+    private setInk() {
 
         let c = this.context;
 
-        c.textAlign = "center";
-        c.lineWidth = 3.5;
-        c.strokeStyle = "#ffeecc";
-        c.fillStyle = "#333333";
-        let y = this.canvas.height / 2 - this.font_pixels / 2;
+        c.strokeStyle = "#221100";
+        c.fillStyle = "#ffeecc";
+        c.lineJoin = "round";
+    }
 
-        c.strokeText(s, this.half_width, y);
-        c.fillText(s, this.half_width, y);
+    middleCenterText(message: string) {
+
+        let c = this.context;
+        let lines = message.split("\n");
+        let big = Math.floor(0.75 * this.scoreHeight);
+        let small = Math.floor(0.42 * this.scoreHeight);
+        let lineHeight = Math.floor(this.scoreHeight * 0.95);
+
+        // The message arrives with newlines in it. Drawn as a single line - which is what this used to
+        // do - a 40-character line at 33 dp ran off both edges of a 393 px square, so the score was
+        // cut off at each end. Stacked, it fits.
+        c.textAlign = "center";
+        this.setInk();
+
+        let y = (this.canvas.height / 2) - ((lineHeight * (lines.length - 1)) / 2);
+
+        for (let i = 0; i < lines.length; i++) {
+
+            if (lines[i].length > 0) {
+                c.font = "bold " + (i === 0 ? big : small) + "px Arial";
+                c.lineWidth = i === 0 ? 6 : 3.5;
+
+                c.strokeText(lines[i], this.half_width, y);
+                c.fillText(lines[i], this.half_width, y);
+            }
+
+            y += lineHeight;
+        }
     }
 
     bottomCenterText(s: string) {
@@ -144,9 +277,7 @@ class Display {
         let c = this.context;
 
         c.textAlign = "center";
-        c.lineWidth = 3.5;
-        c.strokeStyle = "#ffeecc";
-        c.fillStyle = "#333333";
+        this.setInk();
         let y = this.canvas.height - this.step;
 
         c.strokeText(s, this.half_width, y);
@@ -168,7 +299,13 @@ class Display {
         return o;
     }
 
-    showGameOver(message:string) {
+    showGameOver(message: string) {
+
+        // Nothing may repaint the board after this: the shade and the card are painted once, and a
+        // fading "+16" would otherwise clear them a few frames later.
+        this.finished = true;
+        this.floaters = [];
+
         this.shadeBackGround();
         this.middleCenterText(message);
         this.bottomCenterText("Tap to Continue");
@@ -200,7 +337,8 @@ class Display {
                     hidden = (row === null);
                 }
 
-                let t = new Tile(this.board.getPosition(x, y), this.board, this, row, hidden);
+                let t = new Tile(this.board.getPosition(x, y), this.board, this, row, hidden, x);
+                t.pressed = this.pressed !== null && this.pressed.x === x && this.pressed.y === y;
                 t.draw();
             }
         }
@@ -211,6 +349,8 @@ class Display {
         let c = this.context;
 
         c.textAlign = "left";
+        // Explicitly, not inherited from whichever text was drawn last.
+        this.setInk();
 
         c.strokeText(s.toString(), this.horizontalOffset, this.font_pixels);
         c.fillText(s.toString(), this.horizontalOffset, this.font_pixels);
@@ -244,11 +384,38 @@ class Display {
         this.setFont();
 
         this.clearBackGround();
+        this.boardClip();
         this.drawTiles(rows);
+        this.unclip();
         this.updateScore();
 
         this.updateMovesAvailable();
 
+        this.drawFloaters();
+    }
+
+    /**
+     * Tiles enter from above the top row, which is also where the score line is drawn: clipped to the
+     * board, they cannot paint over it. (Measured before this: a refill tile crossed the "20 turns"
+     * readout for 170 ms on every deal-in.)
+     */
+    private boardClip() {
+
+        let c = this.context;
+
+        c.save();
+        c.beginPath();
+        c.rect(
+            this.horizontalOffset,
+            this.verticalOffset,
+            this.game.size * this.step,
+            this.game.size * this.step
+        );
+        c.clip();
+    }
+
+    private unclip() {
+        this.context.restore();
     }
 
     /** drops every tile of a freshly populated board in from just above the grid, one after another */
@@ -305,6 +472,157 @@ class Display {
         }
 
         this.run(moves, onDone);
+    }
+
+    /** the cleared run shrinking away where it stood, before the fall */
+    animatePop(onDone: () => void) {
+
+        let tiles = this.removed;
+        this.removed = [];
+
+        if (tiles.length === 0) {
+            onDone();
+            return;
+        }
+
+        let token = ++this.runToken;
+        let started = -1;
+        let duration = 110;
+
+        let frame = (now: number) => {
+
+            if (token !== this.runToken) {
+                return;
+            }
+
+            if (started < 0) {
+                started = now;
+            }
+
+            let p = Math.min(1, (now - started) / duration);
+
+            this.draw();
+
+            for (let i = 0; i < tiles.length; i++) {
+
+                let t = tiles[i];
+                let tile = new Tile(t.symbol, this.board, this, t.y, false, t.x);
+
+                // a short swell and then away, so the run reads as crushed rather than deleted
+                tile.scale = Math.max(0, 1 + (0.18 * Math.sin(Math.PI * p)) - (p * p));
+                tile.alpha = 1 - p;
+                tile.draw();
+            }
+
+            if (p < 1) {
+                requestAnimationFrame(frame);
+                return;
+            }
+
+            this.draw();
+            onDone();
+        };
+
+        requestAnimationFrame(frame);
+    }
+
+    /** "+16" rising from the run that scored it */
+    scoreFloat(neighbors: NeighborKeys, gained: number) {
+
+        let keys = Object.keys(neighbors);
+
+        if (keys.length === 0 || gained <= 0) {
+            return;
+        }
+
+        let sx = 0;
+        let sy = 0;
+
+        for (let i = 0; i < keys.length; i++) {
+            let parts = keys[i].split(",");
+            sx += parseInt(parts[0], 10);
+            sy += parseInt(parts[1], 10);
+        }
+
+        let cx = this.horizontalOffset + ((sx / keys.length) + 0.5) * this.step;
+        let cy = this.verticalOffset + ((sy / keys.length) + 0.5) * this.step;
+
+        this.float("+" + Display.addCommas(gained.toString()), cx, cy);
+    }
+
+    private float(text: string, cx: number, cy: number) {
+
+        if (this.finished) {
+            return;
+        }
+
+        this.floaters.push({ text: text, x: cx, y: cy, born: Date.now() });
+
+        this.tickEffects();
+    }
+
+    /** keeps drawing while anything is still fading, without holding up the next tap */
+    private tickEffects() {
+
+        let token = ++this.effectToken;
+
+        let frame = () => {
+
+            if (token !== this.effectToken || this.finished) {
+                return;
+            }
+
+            if (this.busy) {
+                // an animation is drawing these frames already, and calls back here when it finishes
+                return;
+            }
+
+            this.draw();
+
+            if (this.floaters.length > 0) {
+                requestAnimationFrame(frame);
+            }
+        };
+
+        requestAnimationFrame(frame);
+    }
+
+    private drawFloaters() {
+
+        if (this.floaters.length === 0) {
+            return;
+        }
+
+        let c = this.context;
+        let now = Date.now();
+        let live: Array<Floater> = [];
+
+        c.textAlign = "center";
+        c.font = "bold " + Math.floor(this.scoreHeight * 0.5) + "px Arial";
+        c.lineWidth = 4;
+        c.strokeStyle = "#221100";
+        c.fillStyle = "#ffeecc";
+
+        for (let i = 0; i < this.floaters.length; i++) {
+
+            let f = this.floaters[i];
+            let age = (now - f.born) / 600;
+
+            if (age >= 1) {
+                continue;
+            }
+
+            live.push(f);
+
+            let y = f.y - (age * this.step);
+
+            c.globalAlpha = 1 - age;
+            c.strokeText(f.text, f.x, y);
+            c.fillText(f.text, f.x, y);
+            c.globalAlpha = 1;
+        }
+
+        this.floaters = live;
     }
 
     /** drops the running animation; its completion callback is not called */
@@ -380,6 +698,9 @@ class Display {
             this.draw();
             this.busy = false;
             onDone();
+
+            // anything still fading (a "+16") keeps going now that the board is still again
+            this.tickEffects();
         };
 
         requestAnimationFrame(frame);

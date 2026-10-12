@@ -27,6 +27,17 @@
             || false;
         let context = new AudioContext();
 
+        // A tap should be felt as well as seen. The Android and iOS wrappers expose one of these; a
+        // plain browser has neither, and navigator.vibrate is unavailable in the Android web view
+        // without the VIBRATE permission, so the wrappers are what can actually do it.
+        function haptic() {
+            if (window.TextCrush && window.TextCrush.tick) {
+                window.TextCrush.tick();
+            } else if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+                window.flutter_inappwebview.callHandler("haptic");
+            }
+        }
+
         let c = document.createElement("canvas");
 
         // A canvas is a bitmap, so give it one backing pixel per device pixel and display it at the
@@ -77,6 +88,11 @@
                 let high_score_key = "high_score";
 
                 c.removeEventListener('click', onClick);
+                c.removeEventListener('pointerdown', pressHandler);
+                c.removeEventListener('pointerup', releaseHandler);
+                c.removeEventListener('pointercancel', releaseHandler);
+                c.removeEventListener('pointerleave', releaseHandler);
+                d.releasePress();
                 let message = "Game Over";
 
                 let high_score = localStorage.getItem(high_score_key);
@@ -117,29 +133,47 @@
 
             }
 
+            function pressHandler(e) {
+                if (d.busy) {
+                    return;
+                }
+
+                let bounds = c.getBoundingClientRect();
+                d.press(e.x - bounds.left, e.y - bounds.top);
+            }
+
+            function releaseHandler() {
+                d.releasePress();
+            }
+
             function onClick(e) {
 
                 if (d.busy) {
                     return;
                 }
 
-                let delay = 150;
-
                 // The canvas sits in the middle of the page, so a click's viewport coordinates have
                 // to be moved into the canvas before the game can map them to a cell.
                 let bounds = c.getBoundingClientRect();
 
+                let scoreBefore = g.score;
+
                 let values = d.onClick(e.x - bounds.left, e.y - bounds.top);
 
                 let neighbors = values["neighbors"];
+                let count = Object.keys(neighbors).length;
 
-                if (Object.keys(neighbors).length === 0) {
+                if (count === 0) {
                     return;
                 }
 
+                haptic();
+
+                // What the run was worth, rising from where it stood.
+                d.scoreFloat(neighbors, g.score - scoreBefore);
+
                 if (AudioContext) {
 
-                    let count = Object.keys(neighbors).length;
                     let noteLength = (500 / 8) / 1000;
 
                     let notes = [];
@@ -157,7 +191,9 @@
 
                 }
 
-                setTimeout(function () {
+                // The run shrinks where it stood, then the board settles. This replaced a flat 150ms
+                // hold followed by an instant collapse.
+                d.animatePop(function () {
 
                     let plan = g.fallPlan();
 
@@ -171,12 +207,16 @@
 
                     });
 
-                }, delay);
+                });
 
             }
 
             d.animateReveal(function () {
                 c.addEventListener('click', onClick);
+                c.addEventListener('pointerdown', pressHandler);
+                c.addEventListener('pointerup', releaseHandler);
+                c.addEventListener('pointercancel', releaseHandler);
+                c.addEventListener('pointerleave', releaseHandler);
             });
         }
 
