@@ -1,5 +1,6 @@
 var Display = (function () {
-    function Display(canvas, game) {
+    function Display(canvas, game, showHud) {
+        if (showHud === void 0) { showHud = true; }
         this.scale = 1;
         this.busy = false;
         this.pressed = null;
@@ -7,6 +8,11 @@ var Display = (function () {
         this.floaters = [];
         this.effectToken = 0;
         this.finished = false;
+        this.squashY = 1;
+        this.focused = null;
+        this.reduceMotion = false;
+        this.showHud = true;
+        this.muted = false;
         this.runToken = 0;
         this.game = game;
         this.board = this.game.board;
@@ -15,7 +21,8 @@ var Display = (function () {
         this.width = this.canvas.width;
         this.height = this.canvas.height;
         this.minimum = Math.min(this.width, this.height);
-        this.scoreHeight = Math.floor(this.minimum / (this.board.size + 1));
+        this.showHud = showHud;
+        this.scoreHeight = showHud ? Math.floor(this.minimum / (this.board.size + 1)) : 0;
         this.verticalOffset = this.scoreHeight;
         this.horizontalOffset = (this.width - this.minimum) / 2;
         this.step = ((this.minimum - this.scoreHeight) / this.board.size);
@@ -33,16 +40,19 @@ var Display = (function () {
                 "y": -1
             };
         }
+        return this.onClickCell(cell.x, cell.y);
+    };
+    Display.prototype.onClickCell = function (x, y) {
         this.busy = true;
         var before = this.board.positions.slice();
         var neighbors = {};
-        this.game.onRemove(cell.x, cell.y, neighbors);
+        this.game.onRemove(x, y, neighbors);
         this.removed = this.captureRemoved(before);
         this.draw();
         return {
             "neighbors": neighbors,
-            "x": cell.x,
-            "y": cell.y
+            "x": x,
+            "y": y
         };
     };
     Display.prototype.cellAt = function (ex, ey) {
@@ -177,6 +187,8 @@ var Display = (function () {
                 }
                 var t = new Tile(this.board.getPosition(x, y), this.board, this, row, hidden, x);
                 t.pressed = this.pressed !== null && this.pressed.x === x && this.pressed.y === y;
+                t.focused = this.focused !== null && this.focused.x === x && this.focused.y === y;
+                t.squashY = this.squashY;
                 t.draw();
             }
         }
@@ -214,9 +226,52 @@ var Display = (function () {
         this.boardClip();
         this.drawTiles(rows);
         this.unclip();
-        this.updateScore();
-        this.updateMovesAvailable();
+        if (this.showHud) {
+            this.updateScore();
+            this.updateMovesAvailable();
+            this.drawMute();
+        }
         this.drawFloaters();
+    };
+    Display.prototype.muteBox = function () {
+        var size = this.scoreHeight;
+        return [this.width - size, 0, size, size];
+    };
+    Display.prototype.hitMute = function (ex, ey) {
+        if (!this.showHud) {
+            return false;
+        }
+        var box = this.muteBox();
+        var x = ex * this.scale;
+        var y = ey * this.scale;
+        return x >= box[0] && x <= (box[0] + box[2]) && y >= box[1] && y <= (box[1] + box[3]);
+    };
+    Display.prototype.drawMute = function () {
+        var box = this.muteBox();
+        var c = this.context;
+        var size = box[2];
+        var cx = box[0] + (size / 2);
+        var cy = box[1] + (size * 0.62);
+        c.textAlign = "center";
+        c.font = "bold " + Math.floor(size * 0.5) + "px Arial";
+        this.setInk();
+        c.strokeText("\u266a", cx, cy);
+        c.fillText("\u266a", cx, cy);
+        if (this.muted) {
+            c.beginPath();
+            c.moveTo(cx - (size * 0.24), cy - (size * 0.22));
+            c.lineTo(cx + (size * 0.24), cy + (size * 0.14));
+            c.lineWidth = Math.max(2, size * 0.07);
+            c.strokeStyle = "#221100";
+            c.stroke();
+            c.lineWidth = Math.max(1, size * 0.035);
+            c.strokeStyle = "#ffeecc";
+            c.stroke();
+        }
+    };
+    Display.prototype.focusCell = function (cell) {
+        this.focused = cell;
+        this.draw();
     };
     Display.prototype.boardClip = function () {
         var c = this.context;
@@ -229,6 +284,11 @@ var Display = (function () {
         this.context.restore();
     };
     Display.prototype.animateReveal = function (onDone) {
+        if (this.reduceMotion) {
+            this.draw();
+            onDone();
+            return;
+        }
         var moves = [];
         var size = this.board.size;
         var index = 0;
@@ -252,6 +312,11 @@ var Display = (function () {
         this.run(moves, onDone);
     };
     Display.prototype.animateFall = function (plan, onDone) {
+        if (this.reduceMotion) {
+            this.draw();
+            onDone();
+            return;
+        }
         var moves = [];
         for (var i = 0; i < plan.length; i++) {
             var m = plan[i];
@@ -266,10 +331,45 @@ var Display = (function () {
         }
         this.run(moves, onDone);
     };
+    Display.prototype.animateSettle = function (onDone) {
+        var _this = this;
+        if (this.reduceMotion) {
+            this.draw();
+            onDone();
+            return;
+        }
+        var token = ++this.runToken;
+        var started = -1;
+        var duration = 90;
+        var frame = function (now) {
+            if (token !== _this.runToken) {
+                return;
+            }
+            if (started < 0) {
+                started = now;
+            }
+            var p = Math.min(1, (now - started) / duration);
+            _this.squashY = 1 - (0.12 * Math.sin(Math.PI * p));
+            _this.draw();
+            if (p < 1) {
+                requestAnimationFrame(frame);
+                return;
+            }
+            _this.squashY = 1;
+            _this.draw();
+            onDone();
+        };
+        requestAnimationFrame(frame);
+    };
     Display.prototype.animatePop = function (onDone) {
         var _this = this;
         var tiles = this.removed;
         this.removed = [];
+        if (this.reduceMotion) {
+            this.draw();
+            onDone();
+            return;
+        }
         if (tiles.length === 0) {
             onDone();
             return;
@@ -319,7 +419,7 @@ var Display = (function () {
         this.float("+" + Display.addCommas(gained.toString()), cx, cy);
     };
     Display.prototype.float = function (text, cx, cy) {
-        if (this.finished) {
+        if (this.finished || this.reduceMotion) {
             return;
         }
         this.floaters.push({ text: text, x: cx, y: cy, born: Date.now() });

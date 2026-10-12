@@ -11,6 +11,12 @@ class Tile {
     scale: number = 1;
     alpha: number = 1;
 
+    /** vertical squash for the landing, 1 = round; the compression is anchored at the tile's bottom */
+    squashY: number = 1;
+
+    /** a keyboard or screen-reader user has this cell focused */
+    focused: boolean = false;
+
     /** a finger is down on this tile */
     pressed: boolean = false;
 
@@ -47,25 +53,26 @@ class Tile {
         let padding = this.display.padding;
 
         // A pressed tile sits a little smaller with a brighter rim, so a tap has an answer before the
-        // run clears.
+        // run clears. On landing the tile squashes vertically about its own bottom edge, so it reads
+        // as taking the weight rather than shrinking into the air.
         let radius = (step / 2 - padding) * this.scale * (this.pressed ? 0.92 : 1);
         let centreX = this.cx + (step - padding) / 2;
-        let centreY = this.cy + (step - padding) / 2;
+        let centreY = this.cy + (step - padding) / 2 + (radius * (1 - this.squashY));
 
         c.globalAlpha = this.alpha;
 
         c.beginPath();
-        c.arc(centreX, centreY, radius, 0, 2 * Math.PI, false);
+        c.ellipse(centreX, centreY, radius, radius * this.squashY, 0, 0, 2 * Math.PI, false);
 
         c.fillStyle = this.position.color;
         c.strokeStyle = this.position.color;
         c.fill();
 
-        if (this.pressed) {
+        if (this.pressed || this.focused) {
             c.beginPath();
-            c.arc(centreX, centreY, radius, 0, 2 * Math.PI, false);
+            c.ellipse(centreX, centreY, radius, radius * this.squashY, 0, 0, 2 * Math.PI, false);
             c.lineWidth = padding * 2;
-            c.strokeStyle = "rgba(255,255,255,0.45)";
+            c.strokeStyle = this.focused ? "rgba(255,238,204,0.9)" : "rgba(255,255,255,0.45)";
             c.stroke();
         }
     }
@@ -78,7 +85,9 @@ class Tile {
         let padding = this.display.padding;
 
         let cx = this.cx;
-        let cy = this.cy + Math.ceil(step * 0.1);
+        // The gloss sits near the top edge, so it has to move down as the tile squashes.
+        let cy = this.cy + Math.ceil(step * 0.1)
+            + ((step / 2 - padding) * this.scale * (1 - this.squashY));
 
         c.beginPath();
 
@@ -86,7 +95,7 @@ class Tile {
             cx + (step - padding) / 2,
             cy + (((step - padding) / 2) * 0.1),
             (step / 2 - padding) * 0.5 * this.scale,
-            (step / 2 - padding) * 0.2 * this.scale,
+            (step / 2 - padding) * 0.2 * this.scale * this.squashY,
             0,
             0,
             2 * Math.PI,

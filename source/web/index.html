@@ -68,8 +68,145 @@
         document.body.style.background = "#221100";
         document.body.appendChild(c);
 
+        // The wrappers draw the score line natively (hud=off) and hand the board the whole square; a
+        // browser gets the game's own score line. The motion preference is the system's, not ours.
+        let nativeHud = /(^|[?&])hud=off(&|$)/.test(location.search);
+        let reduceMotion = !!(window.matchMedia
+            && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+        let muted = localStorage.getItem("muted") === "1";
+
+        // The board is a canvas, so none of it exists for a screen reader or a keyboard. This is that
+        // same information as real DOM: 64 focusable cells carrying their letter and position, and a
+        // live region for the score. It is clipped to nothing visually; focusing a cell rings it on
+        // the canvas instead (Display.focusCell), so a sighted keyboard user is not flying blind.
+        let mirror = document.createElement("div");
+        let status = document.createElement("div");
+
+        (function () {
+            let style = document.createElement("style");
+            style.textContent =
+                "#board-mirror,#board-status{position:absolute;width:1px;height:1px;overflow:hidden;"
+                + "clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}"
+                + "#board-mirror button{width:1px;height:1px}";
+            document.head.appendChild(style);
+        }());
+
+        function buildMirror() {
+
+            mirror.id = "board-mirror";
+            mirror.setAttribute("role", "grid");
+            mirror.setAttribute("aria-label", "Text Crush board");
+
+            status.id = "board-status";
+            status.setAttribute("role", "status");
+            status.setAttribute("aria-live", "polite");
+
+            for (let y = 0; y < 8; y++) {
+                for (let x = 0; x < 8; x++) {
+
+                    let cell = document.createElement("button");
+                    cell.type = "button";
+                    cell.setAttribute("role", "gridcell");
+
+                    cell.addEventListener("focus", function () {
+                        if (d) {
+                            d.focusCell(new Neighbor(x, y));
+                        }
+                    });
+
+                    cell.addEventListener("blur", function () {
+                        if (d) {
+                            d.focusCell(null);
+                        }
+                    });
+
+                    cell.addEventListener("click", function () {
+                        if (playCell && d && g && !d.busy) {
+                            playCell(x, y);
+                        }
+                    });
+
+                    mirror.appendChild(cell);
+                }
+            }
+
+            document.body.appendChild(mirror);
+            document.body.appendChild(status);
+        }
+
+        function updateMirror() {
+
+            if (!d || !g) {
+                return;
+            }
+
+            let cells = mirror.children;
+
+            for (let y = 0; y < 8; y++) {
+                for (let x = 0; x < 8; x++) {
+
+                    let symbol = g.board.getPosition(x, y);
+                    let node = cells[(y * 8) + x];
+                    let place = "row " + (y + 1) + " column " + (x + 1);
+
+                    node.textContent = symbol.value === -1 ? "" : symbol.character;
+                    node.setAttribute("aria-label", symbol.value === -1
+                        ? "empty, " + place
+                        : symbol.character + ", " + place);
+                }
+            }
+
+            status.textContent = "Score " + g.score + ", "
+                + (g.movesAvailable - g.movesUsed) + " turns left";
+        }
+
+        buildMirror();
+
+        // The wrapper's header draws score, turns and best itself, so the game hands it the state
+        // rather than making it read the canvas.
+        function report() {
+
+            if (!g) {
+                return;
+            }
+
+            let state = {
+                score: g.score,
+                turns: g.movesAvailable - g.movesUsed,
+                best: parseInt(localStorage.getItem("high_score") || "0", 10) || 0,
+                muted: muted
+            };
+
+            if (window.TextCrush && window.TextCrush.state) {
+                window.TextCrush.state(JSON.stringify(state));
+            } else if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+                window.flutter_inappwebview.callHandler("state", state);
+            }
+        }
+
+        // The wrapper's sound button calls this; the web build's own note glyph calls it too.
+        window.setTextCrushMuted = function (value) {
+
+            muted = !!value;
+            localStorage.setItem("muted", muted ? "1" : "0");
+
+            if (d) {
+                d.muted = muted;
+                d.draw();
+            }
+
+            report();
+
+            return muted;
+        };
+
         let g = null;
         let d = null;
+
+        // Set once a game exists: the mirror's cells and anything else outside initialize() clear a
+        // run through this, so there is exactly one tap pipeline.
+        let playCell = null;
 
         function initialize() {
 
@@ -78,11 +215,23 @@
             let previous = d;
 
             g = new Game(8, 8);
-            d = new Display(c, g);
+            d = new Display(c, g, !nativeHud);
 
             if (previous !== null) {
                 previous.stop();
             }
+
+            d.reduceMotion = reduceMotion;
+            d.muted = muted;
+
+            // The one tap pipeline, reachable from the mirror as well as from the board.
+            playCell = function (x, y) {
+                let before = g.score;
+                afterRemoval(d.onClickCell(x, y), before);
+            };
+
+            updateMirror();
+            report();
 
             function gameOver() {
                 let high_score_key = "high_score";
@@ -109,6 +258,10 @@
 
                 d.showGameOver(message);
                 d.burst();
+
+                if (g) {
+                    report();
+                }
 
                 g = null;
                 d = null;
@@ -146,19 +299,9 @@
                 d.releasePress();
             }
 
-            function onClick(e) {
-
-                if (d.busy) {
-                    return;
-                }
-
-                // The canvas sits in the middle of the page, so a click's viewport coordinates have
-                // to be moved into the canvas before the game can map them to a cell.
-                let bounds = c.getBoundingClientRect();
-
-                let scoreBefore = g.score;
-
-                let values = d.onClick(e.x - bounds.left, e.y - bounds.top);
+            // Everything that follows a cleared run, whether the tap came from the board, the
+            // keyboard, a screen reader or a wrapper's own control.
+            function afterRemoval(values, scoreBefore) {
 
                 let neighbors = values["neighbors"];
                 let count = Object.keys(neighbors).length;
@@ -172,7 +315,7 @@
                 // What the run was worth, rising from where it stood.
                 d.scoreFloat(neighbors, g.score - scoreBefore);
 
-                if (AudioContext) {
+                if (AudioContext && !muted) {
 
                     let noteLength = (500 / 8) / 1000;
 
@@ -191,8 +334,7 @@
 
                 }
 
-                // The run shrinks where it stood, then the board settles. This replaced a flat 150ms
-                // hold followed by an instant collapse.
+                // The run shrinks where it stood, the board falls, and then takes the impact.
                 d.animatePop(function () {
 
                     let plan = g.fallPlan();
@@ -201,14 +343,42 @@
 
                     d.animateFall(plan, function () {
 
-                        if (g.movesUsed >= g.movesAvailable) {
-                            gameOver();
-                        }
+                        d.animateSettle(function () {
+
+                            updateMirror();
+                            report();
+
+                            if (g.movesUsed >= g.movesAvailable) {
+                                gameOver();
+                            }
+
+                        });
 
                     });
 
                 });
+            }
 
+            function onClick(e) {
+
+                if (d.busy) {
+                    return;
+                }
+
+                // The canvas sits in the middle of the page, so a click's viewport coordinates have
+                // to be moved into the canvas before the game can map them to a cell.
+                let bounds = c.getBoundingClientRect();
+                let x = e.x - bounds.left;
+                let y = e.y - bounds.top;
+
+                if (d.hitMute(x, y)) {
+                    window.setTextCrushMuted(!muted);
+                    return;
+                }
+
+                let scoreBefore = g.score;
+
+                afterRemoval(d.onClick(x, y), scoreBefore);
             }
 
             d.animateReveal(function () {

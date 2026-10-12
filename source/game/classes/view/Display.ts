@@ -70,6 +70,21 @@ class Display {
     /** set once the game is over, so a fading floater cannot repaint over the end card */
     private finished: boolean = false;
 
+    /** vertical squash of the whole board for the landing, 1 = round */
+    private squashY: number = 1;
+
+    /** the cell a keyboard or screen-reader user has focused, drawn with a ring */
+    private focused: Neighbor = null;
+
+    /** follow the system's motion preference: no deal-in, no fall, no pop, no float */
+    reduceMotion: boolean = false;
+
+    /** false when a wrapper draws the score line natively and the board keeps the whole square */
+    showHud: boolean = true;
+
+    /** the sound toggle drawn in the score line (the web build's control; wrappers have their own) */
+    muted: boolean = false;
+
     private overlay: HTMLDivElement;
     private runToken: number = 0;
     private static layer: HTMLDivElement = null;
@@ -82,7 +97,7 @@ class Display {
     private static burstDelay: number = 60;
     private static burstParticles: number = 48;
 
-    constructor(canvas: HTMLCanvasElement, game: Game) {
+    constructor(canvas: HTMLCanvasElement, game: Game, showHud: boolean = true) {
         this.game = game;
         this.board = this.game.board;
         this.canvas = canvas;
@@ -90,7 +105,11 @@ class Display {
         this.width = this.canvas.width;
         this.height = this.canvas.height;
         this.minimum = Math.min(this.width, this.height);
-        this.scoreHeight = Math.floor(this.minimum / (this.board.size + 1));
+        this.showHud = showHud;
+
+        // With a native header the game keeps no room for a score line of its own, and the board takes
+        // the whole square: the tiles come out an eighth larger.
+        this.scoreHeight = showHud ? Math.floor(this.minimum / (this.board.size + 1)) : 0;
         this.verticalOffset = this.scoreHeight;
         this.horizontalOffset = (this.width - this.minimum) / 2;
         this.step = ((this.minimum - this.scoreHeight) / this.board.size);
@@ -121,6 +140,12 @@ class Display {
             };
         }
 
+        return this.onClickCell(cell.x, cell.y);
+    }
+
+    /** clears the run at a cell; the entry point for the board, the keyboard and a screen reader */
+    onClickCell(x: number, y: number) {
+
         this.busy = true;
 
         // The run is remembered before it goes, because afterwards the board no longer has it and
@@ -128,15 +153,15 @@ class Display {
         let before = this.board.positions.slice();
 
         let neighbors: NeighborKeys = {};
-        this.game.onRemove(cell.x, cell.y, neighbors);
+        this.game.onRemove(x, y, neighbors);
         this.removed = this.captureRemoved(before);
 
         this.draw();
 
         return {
             "neighbors": neighbors,
-            "x": cell.x,
-            "y": cell.y
+            "x": x,
+            "y": y
         };
     }
 
@@ -339,6 +364,8 @@ class Display {
 
                 let t = new Tile(this.board.getPosition(x, y), this.board, this, row, hidden, x);
                 t.pressed = this.pressed !== null && this.pressed.x === x && this.pressed.y === y;
+                t.focused = this.focused !== null && this.focused.x === x && this.focused.y === y;
+                t.squashY = this.squashY;
                 t.draw();
             }
         }
@@ -387,11 +414,72 @@ class Display {
         this.boardClip();
         this.drawTiles(rows);
         this.unclip();
-        this.updateScore();
 
-        this.updateMovesAvailable();
+        if (this.showHud) {
+            this.updateScore();
+            this.updateMovesAvailable();
+            this.drawMute();
+        }
 
         this.drawFloaters();
+    }
+
+    /** where the sound toggle sits: a square at the right end of the score line */
+    private muteBox(): Array<number> {
+
+        let size = this.scoreHeight;
+
+        return [this.width - size, 0, size, size];
+    }
+
+    /** true when a css-space point is on the sound toggle */
+    hitMute(ex: number, ey: number): boolean {
+
+        if (!this.showHud) {
+            return false;
+        }
+
+        let box = this.muteBox();
+        let x = ex * this.scale;
+        let y = ey * this.scale;
+
+        return x >= box[0] && x <= (box[0] + box[2]) && y >= box[1] && y <= (box[1] + box[3]);
+    }
+
+    private drawMute() {
+
+        let box = this.muteBox();
+        let c = this.context;
+        let size = box[2];
+        let cx = box[0] + (size / 2);
+        let cy = box[1] + (size * 0.62);
+
+        c.textAlign = "center";
+        c.font = "bold " + Math.floor(size * 0.5) + "px Arial";
+        this.setInk();
+
+        c.strokeText("\u266a", cx, cy);
+        c.fillText("\u266a", cx, cy);
+
+        if (this.muted) {
+            // a slash across the note is unmistakable at this size and needs no second glyph
+            c.beginPath();
+            c.moveTo(cx - (size * 0.24), cy - (size * 0.22));
+            c.lineTo(cx + (size * 0.24), cy + (size * 0.14));
+            c.lineWidth = Math.max(2, size * 0.07);
+            c.strokeStyle = "#221100";
+            c.stroke();
+            c.lineWidth = Math.max(1, size * 0.035);
+            c.strokeStyle = "#ffeecc";
+            c.stroke();
+        }
+    }
+
+    /** a keyboard or screen-reader user moved to a cell: ring it, so sighted keyboard users can see */
+    focusCell(cell: Neighbor) {
+
+        this.focused = cell;
+        this.draw();
     }
 
     /**
@@ -420,6 +508,12 @@ class Display {
 
     /** drops every tile of a freshly populated board in from just above the grid, one after another */
     animateReveal(onDone: () => void) {
+
+        if (this.reduceMotion) {
+            this.draw();
+            onDone();
+            return;
+        }
 
         let moves: Array<AnimationMove> = [];
         let size = this.board.size;
@@ -456,6 +550,12 @@ class Display {
      */
     animateFall(plan: Array<FallMove>, onDone: () => void) {
 
+        if (this.reduceMotion) {
+            this.draw();
+            onDone();
+            return;
+        }
+
         let moves: Array<AnimationMove> = [];
 
         for (let i = 0; i < plan.length; i++) {
@@ -474,11 +574,58 @@ class Display {
         this.run(moves, onDone);
     }
 
+    /** the board taking the impact of the fall: a short squash anchored at each tile's bottom */
+    animateSettle(onDone: () => void) {
+
+        if (this.reduceMotion) {
+            this.draw();
+            onDone();
+            return;
+        }
+
+        let token = ++this.runToken;
+        let started = -1;
+        let duration = 90;
+
+        let frame = (now: number) => {
+
+            if (token !== this.runToken) {
+                return;
+            }
+
+            if (started < 0) {
+                started = now;
+            }
+
+            let p = Math.min(1, (now - started) / duration);
+
+            this.squashY = 1 - (0.12 * Math.sin(Math.PI * p));
+            this.draw();
+
+            if (p < 1) {
+                requestAnimationFrame(frame);
+                return;
+            }
+
+            this.squashY = 1;
+            this.draw();
+            onDone();
+        };
+
+        requestAnimationFrame(frame);
+    }
+
     /** the cleared run shrinking away where it stood, before the fall */
     animatePop(onDone: () => void) {
 
         let tiles = this.removed;
         this.removed = [];
+
+        if (this.reduceMotion) {
+            this.draw();
+            onDone();
+            return;
+        }
 
         if (tiles.length === 0) {
             onDone();
@@ -552,7 +699,7 @@ class Display {
 
     private float(text: string, cx: number, cy: number) {
 
-        if (this.finished) {
+        if (this.finished || this.reduceMotion) {
             return;
         }
 

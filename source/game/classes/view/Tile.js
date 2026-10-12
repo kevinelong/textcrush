@@ -5,6 +5,8 @@ var Tile = (function () {
         if (column === void 0) { column = null; }
         this.scale = 1;
         this.alpha = 1;
+        this.squashY = 1;
+        this.focused = false;
         this.pressed = false;
         this.position = position;
         this.board = board;
@@ -22,18 +24,18 @@ var Tile = (function () {
         var padding = this.display.padding;
         var radius = (step / 2 - padding) * this.scale * (this.pressed ? 0.92 : 1);
         var centreX = this.cx + (step - padding) / 2;
-        var centreY = this.cy + (step - padding) / 2;
+        var centreY = this.cy + (step - padding) / 2 + (radius * (1 - this.squashY));
         c.globalAlpha = this.alpha;
         c.beginPath();
-        c.arc(centreX, centreY, radius, 0, 2 * Math.PI, false);
+        c.ellipse(centreX, centreY, radius, radius * this.squashY, 0, 0, 2 * Math.PI, false);
         c.fillStyle = this.position.color;
         c.strokeStyle = this.position.color;
         c.fill();
-        if (this.pressed) {
+        if (this.pressed || this.focused) {
             c.beginPath();
-            c.arc(centreX, centreY, radius, 0, 2 * Math.PI, false);
+            c.ellipse(centreX, centreY, radius, radius * this.squashY, 0, 0, 2 * Math.PI, false);
             c.lineWidth = padding * 2;
-            c.strokeStyle = "rgba(255,255,255,0.45)";
+            c.strokeStyle = this.focused ? "rgba(255,238,204,0.9)" : "rgba(255,255,255,0.45)";
             c.stroke();
         }
     };
@@ -42,9 +44,10 @@ var Tile = (function () {
         var step = this.display.step;
         var padding = this.display.padding;
         var cx = this.cx;
-        var cy = this.cy + Math.ceil(step * 0.1);
+        var cy = this.cy + Math.ceil(step * 0.1)
+            + ((step / 2 - padding) * this.scale * (1 - this.squashY));
         c.beginPath();
-        c.ellipse(cx + (step - padding) / 2, cy + (((step - padding) / 2) * 0.1), (step / 2 - padding) * 0.5 * this.scale, (step / 2 - padding) * 0.2 * this.scale, 0, 0, 2 * Math.PI, false);
+        c.ellipse(cx + (step - padding) / 2, cy + (((step - padding) / 2) * 0.1), (step / 2 - padding) * 0.5 * this.scale, (step / 2 - padding) * 0.2 * this.scale * this.squashY, 0, 0, 2 * Math.PI, false);
         c.globalAlpha = (this.pressed ? 0.5 : 0.3) * this.alpha;
         c.fillStyle = 'rgb(255,255,255)';
         c.fill();
