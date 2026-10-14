@@ -44,6 +44,7 @@ alt/tc.py            an early Python sketch of the model. It has drifted from th
 test/                the game's rules: node test/game-rules.test.js, no dependencies
 tools/               stage-site.sh (builds the published site), check-live-site.sh (is the published
                      site this checkout?), make_pwa_icons.py
+docs/STATE.md        where this repository stands, and what is waiting to be pushed
 ```
 
 ## Run it locally
