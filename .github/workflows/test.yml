@@ -1,0 +1,32 @@
+# Run the game's rules on every push.
+#
+# The only other workflow here publishes the site, so nothing tested the game: a broken flood fill or
+# an off-by-one in the scoring exponent would have shipped to the live site unchallenged. This runs
+# test/game-rules.test.js, which loads the shipped .js the page loads and needs nothing installed
+# beyond the Node that the runner already has.
+#
+# Deliberately not in this workflow: tools/check-live-site.sh. It asks the deployment what it is
+# serving, and a deploy that has not finished yet is not a code failure.
+name: test
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node
+        run: node --version
+
+      - name: The game's rules
+        run: node test/game-rules.test.js

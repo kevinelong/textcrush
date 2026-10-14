@@ -38,8 +38,12 @@ Every image here is a capture of the game running, not a mock-up.
 ```
 source/web/          the page: canvas, click pipeline, service worker, manifest, icons
 source/game/classes/ the game: TypeScript sources next to the JavaScript the page loads
-alt/tc.py            a Python port of the model, for reference
-tools/               stage-site.sh (builds the published site), make_pwa_icons.py
+alt/tc.py            an early Python sketch of the model. It has drifted from the game and is not a
+                     reference: its scoring is 2^(n-1) written in Python, which is XOR, not the
+                     exponent the game uses
+test/                the game's rules: node test/game-rules.test.js, no dependencies
+tools/               stage-site.sh (builds the published site), check-live-site.sh (is the published
+                     site this checkout?), make_pwa_icons.py
 ```
 
 ## Run it locally
@@ -52,12 +56,19 @@ python -m http.server 8020 --directory build/site
 
 `tools/stage-site.sh` is the single definition of the published layout — GitHub Pages runs the same
 script (`.github/workflows/pages.yml`), so a local check and the live site are assembled identically.
+`sh tools/check-live-site.sh` asks the live site whether it is serving this checkout.
 
 Editing the TypeScript needs a compiler; the JavaScript beside it is generated output:
 
 ```sh
 npx -y -p typescript@5 tsc -p tsconfig.json
 ```
+
+The rules are pinned by `node test/game-rules.test.js`, which loads the same shipped JavaScript the
+page does: the clear and what is connected, the scoring table from a run of one to a run of eight,
+one turn per clear, twenty turns, the fall after a clear, and a game in progress surviving a round
+trip through storage. It needs nothing installed, and `.github/workflows/test.yml` runs it on every
+push — the only other workflow here publishes the site, so nothing tested the game before.
 
 ## Android and iOS
 
