@@ -233,3 +233,25 @@ typings/
 # Serverless directories
 .serverless
 
+# --- dependency stores, caches and build output (added 2026-11-05) ---
+bower_components/
+.deno/
+.venv/
+venv/
+virtualenv/
+site-packages/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.tox/
+.gradle/
+.next/
+.nuxt/
+.parcel-cache/
+target/
+Pods/
+DerivedData/
+.cache/
+.DS_Store
+Thumbs.db
